@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="CricketX - Fantasy Cricket Platform. Create teams, join contests, and win big!" />
     <title>CricketX — Fantasy Cricket</title>
+    <script>
+      // Replace any stale service worker from previous projects with a no-op SW that self-destructs
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          if (regs.length > 0) {
+            // Old SW found — register our cleanup SW to take over, clear caches, and reload
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function() {
+              caches.keys().then(function(names) {
+                return Promise.all(names.map(function(n) { return caches.delete(n); }));
+              });
+            });
+          }
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

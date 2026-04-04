@@ -7,7 +7,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import MatchDetail from './pages/MatchDetail';
 import MyContests from './pages/MyContests';
+import MyBets from './pages/MyBets';
 import Wallet from './pages/Wallet';
+import Profile from './pages/Profile';
 import AdminLayout from './admin/AdminLayout';
 
 function ProtectedRoute({ children }) {
@@ -30,7 +32,9 @@ function AppRoutes() {
           <Route path="/register" element={<Register />} />
           <Route path="/match/:matchId" element={<ProtectedRoute><MatchDetail /></ProtectedRoute>} />
           <Route path="/my-contests" element={<ProtectedRoute><MyContests /></ProtectedRoute>} />
+          <Route path="/my-bets" element={<ProtectedRoute><MyBets /></ProtectedRoute>} />
           <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

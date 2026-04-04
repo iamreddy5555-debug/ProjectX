@@ -6,6 +6,7 @@ const Match = require('../models/Match');
 const Contest = require('../models/Contest');
 const FantasyTeam = require('../models/FantasyTeam');
 const Payment = require('../models/Payment');
+const Bet = require('../models/Bet');
 const QRCode = require('../models/QRCode');
 const ChatMessage = require('../models/ChatMessage');
 const { adminAuth } = require('../middleware/auth');
@@ -244,6 +245,48 @@ router.delete('/contests/:id', adminAuth, async (req, res) => {
   try {
     await Contest.findByIdAndDelete(req.params.id);
     res.json({ message: 'Contest deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ===== BETS =====
+router.get('/bets', adminAuth, async (req, res) => {
+  try {
+    const bets = await Bet.find()
+      .populate('userId', 'name email')
+      .populate('matchId', 'title teamA teamB')
+      .sort({ createdAt: -1 });
+    res.json(bets);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.patch('/bets/:id/settle', adminAuth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['won', 'lost', 'cancelled'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    const bet = await Bet.findById(req.params.id);
+    if (!bet) return res.status(404).json({ message: 'Bet not found' });
+    if (bet.status !== 'pending') return res.status(400).json({ message: 'Bet already settled' });
+
+    bet.status = status;
+    bet.settledAt = new Date();
+    await bet.save();
+
+    // If won, credit user balance with stake + potential win
+    if (status === 'won') {
+      await User.findByIdAndUpdate(bet.userId, { $inc: { balance: bet.stake + bet.potentialWin } });
+    }
+    // If cancelled, refund stake
+    if (status === 'cancelled') {
+      await User.findByIdAndUpdate(bet.userId, { $inc: { balance: bet.stake } });
+    }
+
+    res.json({ message: `Bet ${status}`, bet });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }

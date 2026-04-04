@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/formatters';
-import { Home, Trophy, LogOut, Shield, Wallet, Menu, X } from 'lucide-react';
+import { Home, Trophy, LogOut, Shield, Wallet, Menu, X, User } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Header() {
@@ -51,9 +51,9 @@ export default function Header() {
               <Wallet size={16} />
               {formatCurrency(user.balance || 0)}
             </Link>
-            <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
-              <LogOut size={14} />
-            </button>
+            <Link to="/profile" className="header-profile-btn" title="Profile">
+              <User size={16} />
+            </Link>
           </>
         ) : (
           <>

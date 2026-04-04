@@ -21,12 +21,13 @@ router.get('/', auth, async (req, res) => {
 // Send a message
 router.post('/', auth, async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, receiverId } = req.body;
     if (!message || !message.trim()) {
       return res.status(400).json({ message: 'Message is required' });
     }
     const chatMessage = new ChatMessage({
       senderId: req.user.id,
+      receiverId: receiverId || null,
       message: message.trim(),
       senderRole: req.user.role,
     });

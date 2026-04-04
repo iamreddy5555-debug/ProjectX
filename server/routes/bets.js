@@ -24,7 +24,7 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Match already completed' });
     }
 
-    const potentialWin = betType === 'back' ? stake * (odds - 1) : stake * (odds - 1);
+    const potentialWin = betType === 'back' ? stake * (odds - 1) : stake;
 
     // Deduct stake from balance
     user.balance -= stake;

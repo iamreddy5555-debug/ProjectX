@@ -29,13 +29,12 @@ router.post('/', auth, async (req, res) => {
       if (count > 7) return res.status(400).json({ message: 'Maximum 7 players from one team allowed' });
     }
 
-    // Check role composition: min 1 WK, min 3 BAT, min 3 BOWL, min 1 AR
+    // Check role composition: min 1 WK, min 2 BAT, min 2 BOWL
     const roleCounts = { 'wicket-keeper': 0, 'batsman': 0, 'bowler': 0, 'all-rounder': 0 };
     playerDocs.forEach(p => { roleCounts[p.role] = (roleCounts[p.role] || 0) + 1; });
     if (roleCounts['wicket-keeper'] < 1) return res.status(400).json({ message: 'Select at least 1 Wicket Keeper' });
-    if (roleCounts['batsman'] < 3) return res.status(400).json({ message: 'Select at least 3 Batsmen' });
-    if (roleCounts['bowler'] < 3) return res.status(400).json({ message: 'Select at least 3 Bowlers' });
-    if (roleCounts['all-rounder'] < 1) return res.status(400).json({ message: 'Select at least 1 All Rounder' });
+    if (roleCounts['batsman'] < 2) return res.status(400).json({ message: 'Select at least 2 Batsmen' });
+    if (roleCounts['bowler'] < 2) return res.status(400).json({ message: 'Select at least 2 Bowlers' });
 
     // Calculate total credits
     const totalCredits = playerDocs.reduce((sum, p) => sum + p.credit, 0);

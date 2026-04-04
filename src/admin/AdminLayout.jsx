@@ -1,29 +1,36 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, QrCode, Trophy, MessageCircle, LogOut, Gamepad2 } from 'lucide-react';
+import {
+  LayoutDashboard, Users, CreditCard, QrCode, Trophy,
+  MessageCircle, LogOut, Gamepad2, Target, ChevronLeft, ChevronRight
+} from 'lucide-react';
 import AdminDashboard from './AdminDashboard';
 import AdminUsers from './AdminUsers';
 import AdminPayments from './AdminPayments';
 import AdminQRCodes from './AdminQRCodes';
 import AdminMatches from './AdminMatches';
 import AdminContests from './AdminContests';
+import AdminBets from './AdminBets';
 import AdminChat from './AdminChat';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'users', label: 'Users', icon: Users },
-  { id: 'payments', label: 'Payments', icon: CreditCard, badge: true },
-  { id: 'qrcodes', label: 'QR Codes', icon: QrCode },
   { id: 'matches', label: 'Matches', icon: Trophy },
   { id: 'contests', label: 'Contests', icon: Gamepad2 },
-  { id: 'chat', label: 'Chat', icon: MessageCircle },
+  { id: 'bets', label: 'Bets', icon: Target },
+  { id: 'payments', label: 'Payments', icon: CreditCard, badge: true },
+  { id: 'qrcodes', label: 'QR Codes', icon: QrCode },
+  { id: 'chat', label: 'Chat', icon: MessageCircle, badge: true },
 ];
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
   const [activePage, setActivePage] = useState('dashboard');
   const [pendingCount, setPendingCount] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
 
   if (!user || user.role !== 'admin') {
     return <Navigate to="/login" replace />;
@@ -31,37 +38,56 @@ export default function AdminLayout() {
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard': return <AdminDashboard />;
+      case 'dashboard': return <AdminDashboard onNavigate={setActivePage} />;
       case 'users': return <AdminUsers />;
       case 'payments': return <AdminPayments onPendingCount={setPendingCount} />;
       case 'qrcodes': return <AdminQRCodes />;
       case 'matches': return <AdminMatches />;
       case 'contests': return <AdminContests />;
-      case 'chat': return <AdminChat />;
-      default: return <AdminDashboard />;
+      case 'bets': return <AdminBets />;
+      case 'chat': return <AdminChat onUnreadCount={setUnreadChats} />;
+      default: return <AdminDashboard onNavigate={setActivePage} />;
     }
+  };
+
+  const getBadge = (item) => {
+    if (item.id === 'payments' && pendingCount > 0) return pendingCount;
+    if (item.id === 'chat' && unreadChats > 0) return unreadChats;
+    return 0;
   };
 
   return (
     <div className="admin-layout">
-      <aside className="admin-sidebar">
-        <div className="admin-sidebar-title">Admin Panel</div>
-        {navItems.map(item => (
-          <button
-            key={item.id}
-            className={`admin-nav-item ${activePage === item.id ? 'active' : ''}`}
-            onClick={() => setActivePage(item.id)}
-          >
-            <item.icon size={18} />
-            {item.label}
-            {item.badge && pendingCount > 0 && (
-              <span className="nav-badge">{pendingCount}</span>
-            )}
+      <aside className={`admin-sidebar ${collapsed ? 'collapsed' : ''}`}>
+        <div className="admin-sidebar-header">
+          {!collapsed && <div className="admin-sidebar-title">Admin Panel</div>}
+          <button className="admin-collapse-btn" onClick={() => setCollapsed(!collapsed)}>
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
-        ))}
-        <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-          <button className="admin-nav-item" onClick={logout} style={{ color: 'var(--accent-danger)' }}>
-            <LogOut size={18} /> Logout
+        </div>
+
+        <div className="admin-nav-section">
+          {navItems.map(item => {
+            const badge = getBadge(item);
+            return (
+              <button
+                key={item.id}
+                className={`admin-nav-item ${activePage === item.id ? 'active' : ''}`}
+                onClick={() => setActivePage(item.id)}
+                title={collapsed ? item.label : ''}
+              >
+                <item.icon size={18} />
+                {!collapsed && <span>{item.label}</span>}
+                {badge > 0 && <span className="nav-badge">{badge}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="admin-nav-footer">
+          <button className="admin-nav-item logout-btn" onClick={logout}>
+            <LogOut size={18} />
+            {!collapsed && <span>Logout</span>}
           </button>
         </div>
       </aside>

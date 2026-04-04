@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
-import { Check, X, Eye } from 'lucide-react';
+import { Check, X, Eye, Download, Filter } from 'lucide-react';
 import api from '../utils/api';
 
 export default function AdminPayments({ onPendingCount }) {
@@ -8,6 +8,7 @@ export default function AdminPayments({ onPendingCount }) {
   const [filter, setFilter] = useState('pending');
   const [viewImage, setViewImage] = useState(null);
   const [toast, setToast] = useState('');
+  const [processing, setProcessing] = useState(null);
 
   useEffect(() => { loadPayments(); }, [filter]);
 
@@ -22,35 +23,56 @@ export default function AdminPayments({ onPendingCount }) {
   };
 
   const approvePayment = async (id) => {
+    setProcessing(id);
     try {
       await api.patch(`/admin/payments/${id}/approve`);
-      showToast('Payment approved!');
+      showToast('Payment approved! Balance credited.');
       loadPayments();
     } catch (err) {
       showToast('Failed to approve');
+    } finally {
+      setProcessing(null);
     }
   };
 
   const rejectPayment = async (id) => {
+    if (!window.confirm('Reject this payment? If withdrawal, amount will be refunded.')) return;
+    setProcessing(id);
     try {
       await api.patch(`/admin/payments/${id}/reject`);
       showToast('Payment rejected');
       loadPayments();
     } catch (err) {
       showToast('Failed to reject');
+    } finally {
+      setProcessing(null);
     }
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
+  const filters = [
+    { key: 'pending', label: 'Pending', color: 'var(--accent-warning)' },
+    { key: 'approved', label: 'Approved', color: 'var(--accent-success)' },
+    { key: 'rejected', label: 'Rejected', color: 'var(--accent-danger)' },
+  ];
+
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 className="admin-page-title" style={{ marginBottom: 0 }}>💳 Payments</h1>
+      <div className="admin-page-header">
+        <div>
+          <h1 className="admin-page-title">Payments</h1>
+          <p className="admin-page-subtitle">Manage deposit and withdrawal requests</p>
+        </div>
         <div className="filter-tabs">
-          {['pending', 'approved', 'rejected'].map(f => (
-            <button key={f} className={`filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+          {filters.map(f => (
+            <button
+              key={f.key}
+              className={`filter-tab ${filter === f.key ? 'active' : ''}`}
+              onClick={() => setFilter(f.key)}
+            >
+              <span className="filter-dot" style={{ background: f.color }} />
+              {f.label}
             </button>
           ))}
         </div>
@@ -58,78 +80,101 @@ export default function AdminPayments({ onPendingCount }) {
 
       {payments.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">📭</div>
+          <div className="empty-state-icon-wrap"><Filter size={32} /></div>
           <div className="empty-state-title">No {filter} payments</div>
+          <div className="empty-state-desc">
+            {filter === 'pending' ? 'All caught up! No payments to review.' : `No ${filter} payments found.`}
+          </div>
         </div>
       ) : (
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>UTR</th>
-              <th>Screenshot</th>
-              <th>Date</th>
-              <th>Status</th>
-              {filter === 'pending' && <th>Actions</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {payments.map(p => (
-              <tr key={p._id}>
-                <td>
-                  <div style={{ fontWeight: 600 }}>{p.userId?.name || 'Unknown'}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{p.userId?.email}</div>
-                </td>
-                <td>
-                  <span className={`status-badge ${p.type === 'deposit' ? 'status-approved' : 'status-rejected'}`}>
-                    {p.type}
-                  </span>
-                </td>
-                <td style={{ fontWeight: 700 }}>{formatCurrency(p.amount)}</td>
-                <td style={{ fontSize: '0.85rem' }}>{p.utrNumber || '-'}</td>
-                <td>
-                  {p.screenshotUrl ? (
-                    <img
-                      src={`http://localhost:5000${p.screenshotUrl}`}
-                      alt="Screenshot"
-                      className="screenshot-preview"
-                      onClick={() => setViewImage(`http://localhost:5000${p.screenshotUrl}`)}
-                      style={{ width: 60, height: 45 }}
-                    />
-                  ) : '-'}
-                </td>
-                <td style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>{formatDateTime(p.createdAt)}</td>
-                <td><span className={`status-badge status-${p.status}`}>{p.status}</span></td>
-                {filter === 'pending' && (
-                  <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button className="btn btn-success btn-sm" onClick={() => approvePayment(p._id)}>
-                        <Check size={14} /> Approve
-                      </button>
-                      <button className="btn btn-danger btn-sm" onClick={() => rejectPayment(p._id)}>
-                        <X size={14} /> Reject
-                      </button>
-                    </div>
-                  </td>
+        <div className="payments-cards">
+          {payments.map(p => (
+            <div key={p._id} className="payment-card">
+              <div className="payment-card-top">
+                <div className="payment-card-user">
+                  <div className="payment-card-avatar">
+                    {p.userId?.name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <div>
+                    <div className="payment-card-name">{p.userId?.name || 'Unknown'}</div>
+                    <div className="payment-card-email">{p.userId?.email}</div>
+                  </div>
+                </div>
+                <div className="payment-card-amount-wrap">
+                  <span className={`payment-type-badge ${p.type}`}>{p.type}</span>
+                  <span className="payment-card-amount">{formatCurrency(p.amount)}</span>
+                </div>
+              </div>
+
+              <div className="payment-card-details">
+                {p.utrNumber && (
+                  <div className="payment-detail">
+                    <span className="payment-detail-label">UTR Number</span>
+                    <span className="payment-detail-value">{p.utrNumber}</span>
+                  </div>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                <div className="payment-detail">
+                  <span className="payment-detail-label">Date</span>
+                  <span className="payment-detail-value">{formatDateTime(p.createdAt)}</span>
+                </div>
+                {p.screenshotUrl && (
+                  <div className="payment-detail">
+                    <span className="payment-detail-label">Screenshot</span>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setViewImage(`http://localhost:5000${p.screenshotUrl}`)}
+                    >
+                      <Eye size={14} /> View
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {filter === 'pending' && (
+                <div className="payment-card-actions">
+                  <button
+                    className="btn btn-success"
+                    onClick={() => approvePayment(p._id)}
+                    disabled={processing === p._id}
+                    style={{ flex: 1 }}
+                  >
+                    <Check size={16} /> {processing === p._id ? 'Processing...' : 'Approve'}
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => rejectPayment(p._id)}
+                    disabled={processing === p._id}
+                    style={{ flex: 1 }}
+                  >
+                    <X size={16} /> Reject
+                  </button>
+                </div>
+              )}
+
+              {filter !== 'pending' && (
+                <div className="payment-card-footer">
+                  <span className={`status-badge status-${p.status}`}>{p.status}</span>
+                  {p.processedAt && (
+                    <span className="payment-processed-time">Processed {formatDateTime(p.processedAt)}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Image Viewer */}
       {viewImage && (
         <div className="modal-overlay" onClick={() => setViewImage(null)}>
-          <div style={{ maxWidth: '90%', maxHeight: '90%' }}>
-            <img src={viewImage} alt="Payment Screenshot" style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: 12 }} />
+          <div className="image-viewer" onClick={e => e.stopPropagation()}>
+            <button className="image-viewer-close" onClick={() => setViewImage(null)}><X size={20} /></button>
+            <img src={viewImage} alt="Payment Screenshot" />
           </div>
         </div>
       )}
 
-      {toast && <div className="toast">✅ {toast}</div>}
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }
