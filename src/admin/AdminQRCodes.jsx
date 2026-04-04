@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, ToggleLeft, ToggleRight, X, Upload, QrCode } from 'lucide-react';
-import api from '../utils/api';
+import api, { SERVER_URL } from '../utils/api';
 
 export default function AdminQRCodes() {
   const [qrcodes, setQrcodes] = useState([]);
@@ -113,7 +113,7 @@ export default function AdminQRCodes() {
           {qrcodes.map(qr => (
             <div key={qr._id} className={`qr-card ${!qr.isActive ? 'inactive' : ''}`}>
               <div className="qr-card-image">
-                <img src={`http://localhost:5000${qr.imageUrl}`} alt={qr.label} />
+                <img src={`${SERVER_URL}${qr.imageUrl}`} alt={qr.label} />
                 {!qr.isActive && <div className="qr-card-disabled-overlay">DISABLED</div>}
               </div>
               <div className="qr-card-body">
