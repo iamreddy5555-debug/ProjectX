@@ -6,9 +6,12 @@ const cors = require('cors');
 const path = require('path');
 const connectDB = require('./config/db');
 
-const allowedOrigins = process.env.FRONTEND_URL
-  ? [process.env.FRONTEND_URL, 'http://localhost:5173', 'http://localhost:3000']
-  : ['http://localhost:5173', 'http://localhost:3000'];
+const allowedOrigins = [
+  'https://project-x-tawny-eight.vercel.app',
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean);
 
 const app = express();
 const server = http.createServer(app);

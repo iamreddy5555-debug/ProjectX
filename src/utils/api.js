@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-export const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+const PROD_SERVER = 'https://projectx-f4em.onrender.com';
+const isDev = window.location.hostname === 'localhost';
+const API_BASE = import.meta.env.VITE_API_URL || (isDev ? 'http://localhost:5000/api' : `${PROD_SERVER}/api`);
+export const SERVER_URL = import.meta.env.VITE_SERVER_URL || (isDev ? 'http://localhost:5000' : PROD_SERVER);
 
 const api = axios.create({
   baseURL: API_BASE,
