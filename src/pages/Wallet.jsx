@@ -15,6 +15,9 @@ export default function Wallet() {
   const [screenshot, setScreenshot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState('');
+  const [withdrawMethod, setWithdrawMethod] = useState('');
+  const [bankDetails, setBankDetails] = useState({ accountNumber: '', ifscCode: '', accountHolder: '', bankName: '' });
+  const [withdrawUpiId, setWithdrawUpiId] = useState('');
 
   useEffect(() => {
     loadPayments();
@@ -73,16 +76,34 @@ export default function Wallet() {
 
   const submitWithdraw = async () => {
     if (!amount || parseFloat(amount) < 100) {
-      setToast('Minimum withdrawal is ₹100');
-      return;
+      setToast('Minimum withdrawal is ₹100'); return;
+    }
+    if (!withdrawMethod) {
+      setToast('Select a withdrawal method'); return;
+    }
+    if (withdrawMethod === 'bank') {
+      if (!bankDetails.accountNumber || !bankDetails.ifscCode || !bankDetails.accountHolder) {
+        setToast('Fill all bank account details'); return;
+      }
+    }
+    if (withdrawMethod === 'upi' && !withdrawUpiId) {
+      setToast('Enter your UPI ID'); return;
     }
     setLoading(true);
     try {
-      const res = await api.post('/payments/withdraw', { amount: parseFloat(amount) });
+      const res = await api.post('/payments/withdraw', {
+        amount: parseFloat(amount),
+        withdrawMethod,
+        ...(withdrawMethod === 'bank' ? bankDetails : {}),
+        withdrawUpiId: withdrawMethod === 'upi' ? withdrawUpiId : '',
+      });
       updateBalance(res.data.newBalance);
       setShowWithdraw(false);
       setAmount('');
-      setToast('Withdrawal request submitted!');
+      setWithdrawMethod('');
+      setBankDetails({ accountNumber: '', ifscCode: '', accountHolder: '', bankName: '' });
+      setWithdrawUpiId('');
+      setToast('Withdrawal request submitted! Admin will process shortly.');
       loadPayments();
     } catch (err) {
       setToast(err.response?.data?.message || 'Failed to submit withdrawal');
@@ -200,25 +221,90 @@ export default function Wallet() {
       {/* Withdraw Modal */}
       {showWithdraw && (
         <div className="modal-overlay" onClick={() => setShowWithdraw(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
             <div className="modal-header">
-              <h3 className="modal-title">💸 Withdraw Funds</h3>
-              <button className="bet-slip-close" onClick={() => setShowWithdraw(false)}>
-                <X size={16} />
+              <h3 className="modal-title">Withdraw Funds</h3>
+              <button className="modal-close" onClick={() => setShowWithdraw(false)}>
+                <X size={18} />
               </button>
             </div>
             <div className="modal-body">
-              <p style={{ marginBottom: 16, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                Available: <strong>{formatCurrency(user?.balance || 0)}</strong>
-              </p>
+              <div style={{ background: 'var(--accent-success-light)', padding: '12px 16px', borderRadius: 'var(--radius-md)', marginBottom: 20, fontSize: '0.9rem' }}>
+                Available Balance: <strong style={{ color: 'var(--accent-success)' }}>{formatCurrency(user?.balance || 0)}</strong>
+              </div>
+
               <div className="form-group">
-                <label>Amount (₹)</label>
+                <label>Amount (₹) *</label>
                 <input type="number" placeholder="Enter amount (min ₹100)" value={amount} onChange={e => setAmount(e.target.value)} min="100" />
               </div>
+
+              {/* Withdrawal Method Selection */}
+              <div className="form-group">
+                <label>Withdrawal Method *</label>
+                <div className="withdraw-method-tabs">
+                  <button
+                    type="button"
+                    className={`withdraw-method-tab ${withdrawMethod === 'bank' ? 'active' : ''}`}
+                    onClick={() => setWithdrawMethod('bank')}
+                  >
+                    🏦 Bank Transfer
+                  </button>
+                  <button
+                    type="button"
+                    className={`withdraw-method-tab ${withdrawMethod === 'upi' ? 'active' : ''}`}
+                    onClick={() => setWithdrawMethod('upi')}
+                  >
+                    📱 UPI
+                  </button>
+                </div>
+              </div>
+
+              {/* Bank Details */}
+              {withdrawMethod === 'bank' && (
+                <div className="withdraw-details-section">
+                  <div className="form-group">
+                    <label>Account Holder Name *</label>
+                    <input type="text" placeholder="As per bank records" value={bankDetails.accountHolder}
+                      onChange={e => setBankDetails({ ...bankDetails, accountHolder: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Account Number *</label>
+                    <input type="text" placeholder="Enter account number" value={bankDetails.accountNumber}
+                      onChange={e => setBankDetails({ ...bankDetails, accountNumber: e.target.value.replace(/\D/g, '') })} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div className="form-group">
+                      <label>IFSC Code *</label>
+                      <input type="text" placeholder="e.g. SBIN0001234" value={bankDetails.ifscCode}
+                        onChange={e => setBankDetails({ ...bankDetails, ifscCode: e.target.value.toUpperCase() })}
+                        maxLength={11} />
+                    </div>
+                    <div className="form-group">
+                      <label>Bank Name</label>
+                      <input type="text" placeholder="e.g. SBI, HDFC" value={bankDetails.bankName}
+                        onChange={e => setBankDetails({ ...bankDetails, bankName: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* UPI Details */}
+              {withdrawMethod === 'upi' && (
+                <div className="withdraw-details-section">
+                  <div className="form-group">
+                    <label>UPI ID *</label>
+                    <input type="text" placeholder="yourname@upi" value={withdrawUpiId}
+                      onChange={e => setWithdrawUpiId(e.target.value)} />
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: -8 }}>
+                    Money will be sent to this UPI ID
+                  </p>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowWithdraw(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={submitWithdraw} disabled={loading}>
+              <button className="btn btn-danger" onClick={submitWithdraw} disabled={loading || !withdrawMethod}>
                 {loading ? 'Submitting...' : 'Request Withdrawal'}
               </button>
             </div>

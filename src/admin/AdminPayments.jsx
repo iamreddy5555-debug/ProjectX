@@ -107,6 +107,10 @@ export default function AdminPayments({ onPendingCount }) {
               </div>
 
               <div className="payment-card-details">
+                <div className="payment-detail">
+                  <span className="payment-detail-label">Phone</span>
+                  <span className="payment-detail-value">{p.userId?.phone || '-'}</span>
+                </div>
                 {p.utrNumber && (
                   <div className="payment-detail">
                     <span className="payment-detail-label">UTR Number</span>
@@ -126,6 +130,43 @@ export default function AdminPayments({ onPendingCount }) {
                     >
                       <Eye size={14} /> View
                     </button>
+                  </div>
+                )}
+
+                {/* Withdrawal Bank/UPI Details */}
+                {p.type === 'withdrawal' && p.withdrawMethod && (
+                  <div className="withdraw-info-box">
+                    <div className="withdraw-info-title">
+                      {p.withdrawMethod === 'bank' ? '🏦 Bank Transfer' : '📱 UPI Transfer'}
+                    </div>
+                    {p.withdrawMethod === 'bank' && (
+                      <>
+                        <div className="payment-detail">
+                          <span className="payment-detail-label">Account Holder</span>
+                          <span className="payment-detail-value">{p.accountHolder}</span>
+                        </div>
+                        <div className="payment-detail">
+                          <span className="payment-detail-label">Account Number</span>
+                          <span className="payment-detail-value" style={{ fontFamily: 'monospace' }}>{p.accountNumber}</span>
+                        </div>
+                        <div className="payment-detail">
+                          <span className="payment-detail-label">IFSC Code</span>
+                          <span className="payment-detail-value" style={{ fontFamily: 'monospace' }}>{p.ifscCode}</span>
+                        </div>
+                        {p.bankName && (
+                          <div className="payment-detail">
+                            <span className="payment-detail-label">Bank</span>
+                            <span className="payment-detail-value">{p.bankName}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    {p.withdrawMethod === 'upi' && (
+                      <div className="payment-detail">
+                        <span className="payment-detail-label">UPI ID</span>
+                        <span className="payment-detail-value" style={{ fontFamily: 'monospace', color: 'var(--accent-primary)' }}>{p.withdrawUpiId}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

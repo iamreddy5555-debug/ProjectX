@@ -58,10 +58,23 @@ router.post('/deposit', auth, upload.single('screenshot'), async (req, res) => {
 // Submit withdrawal request
 router.post('/withdraw', auth, async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, withdrawMethod, accountNumber, ifscCode, accountHolder, bankName, withdrawUpiId } = req.body;
     if (!amount || amount < 100) {
       return res.status(400).json({ message: 'Minimum withdrawal is ₹100' });
     }
+    if (!withdrawMethod) {
+      return res.status(400).json({ message: 'Select a withdrawal method' });
+    }
+    if (withdrawMethod === 'bank') {
+      if (!accountNumber || !ifscCode || !accountHolder) {
+        return res.status(400).json({ message: 'Account number, IFSC code, and account holder name are required' });
+      }
+    } else if (withdrawMethod === 'upi') {
+      if (!withdrawUpiId) {
+        return res.status(400).json({ message: 'UPI ID is required' });
+      }
+    }
+
     const user = await User.findById(req.user.id);
     if (user.balance < amount) {
       return res.status(400).json({ message: 'Insufficient balance' });
@@ -75,6 +88,12 @@ router.post('/withdraw', auth, async (req, res) => {
       type: 'withdrawal',
       amount,
       status: 'pending',
+      withdrawMethod,
+      accountNumber: accountNumber || '',
+      ifscCode: ifscCode || '',
+      accountHolder: accountHolder || '',
+      bankName: bankName || '',
+      withdrawUpiId: withdrawUpiId || '',
     });
     await payment.save();
     res.status(201).json({ message: 'Withdrawal request submitted', payment, newBalance: user.balance });

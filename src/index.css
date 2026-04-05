@@ -2341,6 +2341,63 @@ a {
   color: var(--accent-success);
 }
 
+/* ========== WITHDRAWAL METHOD TABS ========== */
+.withdraw-method-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.withdraw-method-tab {
+  padding: 14px 16px;
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.withdraw-method-tab:hover {
+  border-color: var(--accent-primary);
+}
+
+.withdraw-method-tab.active {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
+}
+
+.withdraw-details-section {
+  margin-top: 4px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+/* Admin withdrawal info box */
+.withdraw-info-box {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: var(--accent-primary-light);
+  border: 1px solid rgba(79, 70, 229, 0.15);
+  border-radius: var(--radius-md);
+}
+
+.withdraw-info-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+  color: var(--accent-primary);
+}
+
+.withdraw-info-box .payment-detail {
+  padding: 4px 0;
+}
+
 /* ========== PROFILE PAGE ========== */
 .profile-card {
   background: var(--bg-card);
