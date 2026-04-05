@@ -63,7 +63,7 @@ export default function AdminQRCodes() {
 
   const toggleQR = async (id) => {
     try {
-      await api.patch(`/admin/qrcodes/${id}/toggle`);
+      await api.patch(`/admin/qrcodes/${id}/toggle`, {});
       loadQRCodes();
     } catch (err) {
       showToast('Failed to toggle');

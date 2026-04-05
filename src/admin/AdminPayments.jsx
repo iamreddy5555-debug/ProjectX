@@ -25,7 +25,7 @@ export default function AdminPayments({ onPendingCount }) {
   const approvePayment = async (id) => {
     setProcessing(id);
     try {
-      await api.patch(`/admin/payments/${id}/approve`);
+      await api.patch(`/admin/payments/${id}/approve`, {});
       showToast('Payment approved! Balance credited.');
       loadPayments();
     } catch (err) {
@@ -39,7 +39,7 @@ export default function AdminPayments({ onPendingCount }) {
     if (!window.confirm('Reject this payment? If withdrawal, amount will be refunded.')) return;
     setProcessing(id);
     try {
-      await api.patch(`/admin/payments/${id}/reject`);
+      await api.patch(`/admin/payments/${id}/reject`, {});
       showToast('Payment rejected');
       loadPayments();
     } catch (err) {

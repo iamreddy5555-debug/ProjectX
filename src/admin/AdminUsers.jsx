@@ -38,7 +38,7 @@ export default function AdminUsers() {
   const toggleBan = async (userId, currentlyBanned) => {
     if (!currentlyBanned && !window.confirm('Ban this user? They won\'t be able to log in or place bets.')) return;
     try {
-      await api.patch(`/admin/users/${userId}/ban`);
+      await api.patch(`/admin/users/${userId}/ban`, {});
       loadUsers();
       showToast(currentlyBanned ? 'User unbanned' : 'User banned');
     } catch (err) {

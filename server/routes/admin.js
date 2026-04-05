@@ -134,7 +134,7 @@ router.patch('/payments/:id/approve', adminAuth, async (req, res) => {
     payment.status = 'approved';
     payment.processedBy = req.user.id;
     payment.processedAt = new Date();
-    payment.adminNote = req.body.adminNote || '';
+    payment.adminNote = req.body?.adminNote || '';
     await payment.save();
 
     if (payment.type === 'deposit') {
@@ -156,7 +156,7 @@ router.patch('/payments/:id/reject', adminAuth, async (req, res) => {
     payment.status = 'rejected';
     payment.processedBy = req.user.id;
     payment.processedAt = new Date();
-    payment.adminNote = req.body.adminNote || '';
+    payment.adminNote = req.body?.adminNote || '';
     await payment.save();
 
     // Refund if withdrawal was rejected
