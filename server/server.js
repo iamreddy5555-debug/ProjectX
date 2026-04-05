@@ -19,6 +19,13 @@ const io = new Server(server, {
   cors: { origin: allowedOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] }
 });
 
+// Ensure upload directories exist
+const fs = require('fs');
+['uploads/qrcodes', 'uploads/screenshots'].forEach(dir => {
+  const fullPath = path.join(__dirname, dir);
+  if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
+});
+
 // Middleware
 app.use(cors({ origin: allowedOrigins, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], credentials: true }));
 app.use(express.json());
