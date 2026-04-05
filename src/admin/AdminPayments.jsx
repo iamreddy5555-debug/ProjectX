@@ -29,7 +29,8 @@ export default function AdminPayments({ onPendingCount }) {
       showToast('Payment approved! Balance credited.');
       loadPayments();
     } catch (err) {
-      showToast('Failed to approve');
+      showToast(err.response?.data?.message || 'Failed to approve');
+      loadPayments();
     } finally {
       setProcessing(null);
     }
@@ -43,7 +44,8 @@ export default function AdminPayments({ onPendingCount }) {
       showToast('Payment rejected');
       loadPayments();
     } catch (err) {
-      showToast('Failed to reject');
+      showToast(err.response?.data?.message || 'Failed to reject');
+      loadPayments();
     } finally {
       setProcessing(null);
     }
