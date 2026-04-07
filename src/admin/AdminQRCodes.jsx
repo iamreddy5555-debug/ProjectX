@@ -40,14 +40,13 @@ export default function AdminQRCodes() {
       formData.append('upiId', upiId);
       formData.append('label', label || 'Payment QR');
       formData.append('qrImage', qrFile);
-      await api.post('/admin/qrcodes', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      // Don't set Content-Type — axios will auto-set with the multipart boundary
+      await api.post('/admin/qrcodes', formData);
       resetForm();
       showToast('QR Code added successfully!');
       loadQRCodes();
     } catch (err) {
-      showToast('Failed to add QR code');
+      showToast(err.response?.data?.message || 'Failed to add QR code');
     } finally {
       setLoading(false);
     }

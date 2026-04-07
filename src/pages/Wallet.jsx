@@ -58,9 +58,7 @@ export default function Wallet() {
       formData.append('screenshot', screenshot);
       formData.append('qrCodeId', qrCode?._id || '');
       formData.append('utrNumber', utr);
-      await api.post('/payments/deposit', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await api.post('/payments/deposit', formData);
       setShowDeposit(false);
       setAmount('');
       setScreenshot(null);
