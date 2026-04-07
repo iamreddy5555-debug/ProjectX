@@ -21,21 +21,47 @@ const qrUpload = multer({ storage: qrStorage, limits: { fileSize: 5 * 1024 * 102
 
 // ===== RESEED PLAYERS =====
 router.post('/reseed', adminAuth, async (req, res) => {
+  const log = [];
   try {
     const hasKey = !!process.env.RAPIDAPI_KEY;
     const hasHost = !!process.env.RAPIDAPI_HOST;
+    log.push(`hasKey=${hasKey}, hasHost=${hasHost}`);
     if (!hasKey || !hasHost) {
-      return res.status(500).json({
-        success: false,
-        message: `Missing env vars: ${!hasKey ? 'RAPIDAPI_KEY ' : ''}${!hasHost ? 'RAPIDAPI_HOST' : ''}`,
-      });
+      return res.status(500).json({ success: false, log, message: 'Missing env vars' });
     }
+
+    // Try direct API call first to verify connectivity
+    log.push('Calling Cricbuzz series API...');
+    const url = `https://${process.env.RAPIDAPI_HOST}/series/v1/9241`;
+    const apiRes = await fetch(url, {
+      headers: {
+        'x-rapidapi-host': process.env.RAPIDAPI_HOST,
+        'x-rapidapi-key': process.env.RAPIDAPI_KEY,
+      },
+    });
+    log.push(`API status: ${apiRes.status} ${apiRes.statusText}`);
+    if (!apiRes.ok) {
+      const txt = await apiRes.text().catch(() => '');
+      return res.status(500).json({ success: false, log, body: txt.substring(0, 300) });
+    }
+
+    const data = await apiRes.json();
+    log.push(`matchDetails count: ${(data.matchDetails || []).length}`);
+
     const cricbuzz = require('../services/cricbuzz');
     const ok = await cricbuzz.seedIPLData();
-    res.json({ success: ok, message: ok ? 'Reseeded successfully' : 'Reseed failed - check server logs' });
+    log.push(`seedIPLData returned: ${ok}`);
+
+    // Count players in DB now
+    const Player = require('../models/Player');
+    const playerCount = await Player.countDocuments();
+    log.push(`Players in DB: ${playerCount}`);
+
+    res.json({ success: ok, log });
   } catch (error) {
     console.error('Reseed error:', error);
-    res.status(500).json({ message: 'Reseed error', error: error.message, stack: error.stack });
+    log.push(`EXCEPTION: ${error.message}`);
+    res.status(500).json({ success: false, log, error: error.message });
   }
 });
 
