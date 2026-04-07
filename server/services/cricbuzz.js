@@ -210,20 +210,31 @@ const seedIPLData = async () => {
       .filter(m => m.status === 'completed' || m.status === 'live')
       .sort((a, b) => b.startTime - a.startTime);
 
+    const allTeamNames = new Set();
+    savedMatches.forEach(m => { allTeamNames.add(m.teamA); allTeamNames.add(m.teamB); });
+
     let allPlayers = [];
-    // Try up to 3 recent matches to get a good player pool
-    for (const match of matchesWithScorecard.slice(0, 3)) {
+    const teamsCovered = new Set();
+
+    for (let i = 0; i < matchesWithScorecard.length; i++) {
+      if (teamsCovered.size >= allTeamNames.size) break;
+      if (i >= 15) break;
+      const match = matchesWithScorecard[i];
+      if (teamsCovered.has(match.teamA) && teamsCovered.has(match.teamB)) continue;
+
       console.log(`🔄 Fetching players from: ${match.title} (${match.apiId})...`);
       const players = await fetchPlayersFromScorecard(match.apiId, match.teamA, match.teamB);
       if (players.length > 0) {
-        // Avoid duplicate players (same name + team)
         for (const p of players) {
           if (!allPlayers.some(ep => ep.name === p.name && ep.team === p.team)) {
             allPlayers.push(p);
           }
         }
+        teamsCovered.add(match.teamA);
+        teamsCovered.add(match.teamB);
       }
     }
+    console.log(`📊 Teams covered: ${teamsCovered.size}/${allTeamNames.size}`);
 
     if (allPlayers.length > 0) {
       await Player.insertMany(allPlayers);
