@@ -32,6 +32,9 @@ export default function MatchDetail() {
   const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Match locked = started or finished, no team creation allowed
+  const matchLocked = match && (match.status === 'live' || match.status === 'completed' || new Date(match.startTime) <= new Date());
+
   useEffect(() => { loadAll(); }, [matchId]);
 
   const loadAll = async () => {
@@ -150,16 +153,23 @@ export default function MatchDetail() {
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>My Teams ({myTeams.length})</h2>
-              {match.status !== 'completed' && (
+              {!matchLocked && (
                 <button className="btn btn-primary" onClick={() => setStep('create-team')}>
                   + Create Team
                 </button>
               )}
             </div>
+            {matchLocked && (
+              <div style={{ background: 'var(--accent-warning-light)', color: 'var(--accent-warning)', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: 12, fontSize: '0.85rem', fontWeight: 600 }}>
+                🔒 Match has started — team creation is closed
+              </div>
+            )}
             {myTeams.length === 0 ? (
               <div style={{ background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-lg)', padding: 24, textAlign: 'center' }}>
                 <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>No teams created yet</p>
-                <button className="btn btn-primary" onClick={() => setStep('create-team')}>Create Your First Team</button>
+                {!matchLocked && (
+                  <button className="btn btn-primary" onClick={() => setStep('create-team')}>Create Your First Team</button>
+                )}
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>

@@ -19,6 +19,17 @@ const qrStorage = multer.diskStorage({
 });
 const qrUpload = multer({ storage: qrStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
+// ===== RESEED PLAYERS =====
+router.post('/reseed', adminAuth, async (req, res) => {
+  try {
+    const cricbuzz = require('../services/cricbuzz');
+    const ok = await cricbuzz.seedIPLData();
+    res.json({ success: ok, message: ok ? 'Reseeded successfully' : 'Reseed failed' });
+  } catch (error) {
+    res.status(500).json({ message: 'Reseed error', error: error.message });
+  }
+});
+
 // ===== DASHBOARD STATS =====
 router.get('/stats', adminAuth, async (req, res) => {
   try {

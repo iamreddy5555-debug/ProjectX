@@ -17,6 +17,8 @@ router.post('/', auth, async (req, res) => {
     const match = await Match.findById(matchId);
     if (!match) return res.status(404).json({ message: 'Match not found' });
     if (match.status === 'completed') return res.status(400).json({ message: 'Match already completed' });
+    if (match.status === 'live') return res.status(400).json({ message: 'Match has already started — team creation is closed' });
+    if (new Date(match.startTime) <= new Date()) return res.status(400).json({ message: 'Match has already started — team creation is closed' });
 
     // Validate player composition
     const playerDocs = await Player.find({ _id: { $in: players } });
