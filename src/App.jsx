@@ -5,8 +5,7 @@ import ChatWidget from './components/ChatWidget';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import MatchDetail from './pages/MatchDetail';
-import MyContests from './pages/MyContests';
+import BetMatch from './pages/BetMatch';
 import MyBets from './pages/MyBets';
 import Wallet from './pages/Wallet';
 import Profile from './pages/Profile';
@@ -30,8 +29,7 @@ function AppRoutes() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/match/:matchId" element={<ProtectedRoute><MatchDetail /></ProtectedRoute>} />
-          <Route path="/my-contests" element={<ProtectedRoute><MyContests /></ProtectedRoute>} />
+          <Route path="/bet/:matchId" element={<ProtectedRoute><BetMatch /></ProtectedRoute>} />
           <Route path="/my-bets" element={<ProtectedRoute><MyBets /></ProtectedRoute>} />
           <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

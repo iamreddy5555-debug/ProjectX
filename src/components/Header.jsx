@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/formatters';
-import { Home, Trophy, LogOut, Shield, Wallet, Menu, X, User } from 'lucide-react';
+import { Home, Target, Shield, Wallet, User } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Header() {
@@ -28,8 +28,8 @@ export default function Header() {
           <Home size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Matches
         </Link>
         {user && (
-          <Link to="/my-contests" className={isActive('/my-contests')}>
-            <Trophy size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> My Contests
+          <Link to="/my-bets" className={isActive('/my-bets')}>
+            <Target size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> My Bets
           </Link>
         )}
         {user && (

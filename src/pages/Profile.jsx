@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/formatters';
-import { User, Mail, Phone, Wallet, LogOut, Shield, Trophy, Target } from 'lucide-react';
+import { Mail, Phone, Wallet, LogOut, Target } from 'lucide-react';
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -17,7 +17,6 @@ export default function Profile() {
 
   const menuItems = [
     { icon: Wallet, label: 'My Wallet', desc: 'Deposit & withdraw funds', onClick: () => navigate('/wallet') },
-    { icon: Trophy, label: 'My Contests', desc: 'View joined contests', onClick: () => navigate('/my-contests') },
     { icon: Target, label: 'My Bets', desc: 'View bet history', onClick: () => navigate('/my-bets') },
   ];
 
