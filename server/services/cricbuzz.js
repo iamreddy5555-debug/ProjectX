@@ -1,6 +1,7 @@
 const Player = require('../models/Player');
 const Match = require('../models/Match');
 const Contest = require('../models/Contest');
+const { getAllPlayers, SQUADS } = require('../data/iplPlayers');
 
 const IPL_SERIES_ID = '9241';
 const API_HOST = process.env.RAPIDAPI_HOST;
@@ -143,13 +144,55 @@ const fetchPlayersFromScorecard = async (matchId, teamAName, teamBName) => {
   }
 };
 
+// Build a fallback schedule from the 10 IPL teams (round-robin) when API fails
+const buildFallbackSchedule = () => {
+  const teams = Object.keys(SQUADS);
+  const matches = [];
+  const baseDate = new Date();
+  baseDate.setHours(19, 30, 0, 0);
+  let day = 0;
+  let id = 100000;
+
+  for (let i = 0; i < teams.length; i++) {
+    for (let j = i + 1; j < teams.length; j++) {
+      const startTime = new Date(baseDate);
+      startTime.setDate(baseDate.getDate() + day);
+      day++;
+      matches.push({
+        apiId: `fallback-${id++}`,
+        title: `${teams[i]} vs ${teams[j]}`,
+        desc: `Match ${matches.length + 1}`,
+        teamA: teams[i],
+        teamB: teams[j],
+        league: 'Indian Premier League 2026',
+        startTime,
+        status: 'upcoming',
+        result: '',
+        scoreA: '',
+        scoreB: '',
+        venue: '',
+      });
+    }
+  }
+  return matches;
+};
+
 // Main seeder: fetches all IPL data and populates DB
 const seedIPLData = async () => {
   try {
-    const iplMatches = await fetchIPLMatches();
-    if (iplMatches.length === 0) {
-      console.log('⚠️ No IPL matches found');
-      return false;
+    let iplMatches = [];
+    let apiAvailable = true;
+    try {
+      iplMatches = await fetchIPLMatches();
+      if (iplMatches.length === 0) apiAvailable = false;
+    } catch (apiErr) {
+      console.log(`⚠️ Cricbuzz API failed: ${apiErr.message} — using fallback schedule`);
+      apiAvailable = false;
+    }
+
+    if (!apiAvailable) {
+      iplMatches = buildFallbackSchedule();
+      console.log(`📋 Using hardcoded fallback schedule: ${iplMatches.length} matches`);
     }
 
     console.log(`✅ Found ${iplMatches.length} IPL 2026 matches`);
@@ -205,43 +248,10 @@ const seedIPLData = async () => {
       console.log(`✅ Created ${contestsToInsert.length} contests`);
     }
 
-    // Fetch players from the most recent completed or live match that has scorecard data
-    const matchesWithScorecard = savedMatches
-      .filter(m => m.status === 'completed' || m.status === 'live')
-      .sort((a, b) => b.startTime - a.startTime);
-
-    const allTeamNames = new Set();
-    savedMatches.forEach(m => { allTeamNames.add(m.teamA); allTeamNames.add(m.teamB); });
-
-    let allPlayers = [];
-    const teamsCovered = new Set();
-
-    for (let i = 0; i < matchesWithScorecard.length; i++) {
-      if (teamsCovered.size >= allTeamNames.size) break;
-      if (i >= 15) break;
-      const match = matchesWithScorecard[i];
-      if (teamsCovered.has(match.teamA) && teamsCovered.has(match.teamB)) continue;
-
-      console.log(`🔄 Fetching players from: ${match.title} (${match.apiId})...`);
-      const players = await fetchPlayersFromScorecard(match.apiId, match.teamA, match.teamB);
-      if (players.length > 0) {
-        for (const p of players) {
-          if (!allPlayers.some(ep => ep.name === p.name && ep.team === p.team)) {
-            allPlayers.push(p);
-          }
-        }
-        teamsCovered.add(match.teamA);
-        teamsCovered.add(match.teamB);
-      }
-    }
-    console.log(`📊 Teams covered: ${teamsCovered.size}/${allTeamNames.size}`);
-
-    if (allPlayers.length > 0) {
-      await Player.insertMany(allPlayers);
-      console.log(`✅ Loaded ${allPlayers.length} players from IPL scorecards`);
-    } else {
-      console.log('⚠️ No player data available from scorecards');
-    }
+    // ALWAYS seed players from static IPL squads — guaranteed coverage for all 10 teams
+    const staticPlayers = getAllPlayers();
+    await Player.insertMany(staticPlayers);
+    console.log(`✅ Loaded ${staticPlayers.length} players from static IPL squads`);
 
     return true;
   } catch (error) {
