@@ -10,6 +10,8 @@ const matchSchema = new mongoose.Schema({
   oddsTeamA: { back: { type: Number, default: 1.5 }, lay: { type: Number, default: 1.55 } },
   oddsTeamB: { back: { type: Number, default: 2.5 }, lay: { type: Number, default: 2.55 } },
   oddsDraw: { back: { type: Number, default: 3.0 }, lay: { type: Number, default: 3.1 } },
+  // Custom payout multiplier — what users get back if they win (e.g. 2.0 = double the stake)
+  winMultiplier: { type: Number, default: 2.0, min: 1.01 },
   scoreA: { type: String, default: '' },
   scoreB: { type: String, default: '' },
   result: { type: String, default: '' },

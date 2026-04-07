@@ -102,7 +102,7 @@ export default function AdminMatches() {
               <th>Start Time</th>
               <th>Score</th>
               <th>Status</th>
-              <th>Odds (A/B)</th>
+              <th>Win Multiplier</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -145,10 +145,24 @@ export default function AdminMatches() {
                     <option value="completed">Completed</option>
                   </select>
                 </td>
-                <td style={{ fontSize: '0.8rem' }}>
-                  <span style={{ color: 'var(--back-blue-dark)' }}>{m.oddsTeamA?.back}</span>
-                  {' / '}
-                  <span style={{ color: 'var(--back-blue-dark)' }}>{m.oddsTeamB?.back}</span>
+                <td>
+                  <div className="multiplier-edit">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1.01"
+                      defaultValue={m.winMultiplier ?? 2}
+                      onBlur={(e) => {
+                        const val = parseFloat(e.target.value);
+                        if (val && val !== m.winMultiplier) updateMatch(m._id, { winMultiplier: val });
+                      }}
+                      onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                    />
+                    <span className="multiplier-x">×</span>
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    ₹49 → ₹{Math.round(49 * (m.winMultiplier ?? 2))}
+                  </div>
                 </td>
                 <td>
                   <button className="btn btn-danger btn-sm" onClick={() => deleteMatch(m._id)}>

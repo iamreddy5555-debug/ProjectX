@@ -60,9 +60,7 @@ export default function BetMatch() {
     try {
       const res = await api.post('/bets', {
         matchId,
-        selection: selectedTeam, // 'teamA' or 'teamB'
-        betType: 'back',
-        odds: 2.0, // win double the stake
+        selection: selectedTeam,
         stake,
       });
       updateBalance(res.data.newBalance);
@@ -81,6 +79,9 @@ export default function BetMatch() {
   if (!match) {
     return <div className="main-content"><div className="empty-state"><div className="empty-state-title">Match not found</div></div></div>;
   }
+
+  const multiplier = match.winMultiplier ?? 2.0;
+  const winAmount = (amt) => Math.round(amt * multiplier);
 
   return (
     <div className="main-content" style={{ maxWidth: 720 }}>
@@ -162,7 +163,7 @@ export default function BetMatch() {
               disabled={matchLocked}
             >
               <div className="bet-stake-amount">₹{amount}</div>
-              <div className="bet-stake-win">Win ₹{amount * 2}</div>
+              <div className="bet-stake-win">Win ₹{winAmount(amount)}</div>
             </button>
           ))}
         </div>
@@ -178,9 +179,13 @@ export default function BetMatch() {
           <span>Entry</span>
           <strong>{formatCurrency(stake)}</strong>
         </div>
+        <div className="bet-summary-row">
+          <span>Win multiplier</span>
+          <strong>{multiplier}×</strong>
+        </div>
         <div className="bet-summary-row total">
           <span>If you win</span>
-          <strong>{formatCurrency(stake * 2)}</strong>
+          <strong>{formatCurrency(winAmount(stake))}</strong>
         </div>
 
         <button

@@ -1693,6 +1693,40 @@ a {
   cursor: pointer;
 }
 
+/* Multiplier inline editor */
+.multiplier-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-tertiary);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  transition: border-color var(--transition-fast);
+}
+
+.multiplier-edit:focus-within {
+  border-color: var(--accent-primary);
+}
+
+.multiplier-edit input {
+  width: 50px;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: right;
+  padding: 4px 0;
+}
+
+.multiplier-x {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
 /* Score editing */
 .score-edit {
   display: flex;

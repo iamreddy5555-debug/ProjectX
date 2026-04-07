@@ -8,9 +8,12 @@ const router = express.Router();
 // Place a bet
 router.post('/', auth, async (req, res) => {
   try {
-    const { matchId, selection, betType, odds, stake } = req.body;
-    if (!matchId || !selection || !betType || !odds || !stake) {
-      return res.status(400).json({ message: 'All fields are required' });
+    const { matchId, selection, stake } = req.body;
+    if (!matchId || !selection || !stake) {
+      return res.status(400).json({ message: 'matchId, selection and stake are required' });
+    }
+    if (!['teamA', 'teamB', 'draw'].includes(selection)) {
+      return res.status(400).json({ message: 'Invalid selection' });
     }
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -23,8 +26,13 @@ router.post('/', auth, async (req, res) => {
     if (match.status === 'completed') {
       return res.status(400).json({ message: 'Match already completed' });
     }
+    if (match.status === 'live' || new Date(match.startTime) <= new Date()) {
+      return res.status(400).json({ message: 'Match has started — betting is closed' });
+    }
 
-    const potentialWin = betType === 'back' ? stake * (odds - 1) : stake;
+    // Server-side authoritative payout — uses admin-controlled multiplier
+    const multiplier = match.winMultiplier || 2.0;
+    const potentialWin = parseFloat((stake * (multiplier - 1)).toFixed(2));
 
     // Deduct stake from balance
     user.balance -= stake;
@@ -34,10 +42,10 @@ router.post('/', auth, async (req, res) => {
       userId: req.user.id,
       matchId,
       selection,
-      betType,
-      odds,
+      betType: 'back',
+      odds: multiplier,
       stake,
-      potentialWin: parseFloat(potentialWin.toFixed(2)),
+      potentialWin,
     });
     await bet.save();
 
