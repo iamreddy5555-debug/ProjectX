@@ -22,11 +22,20 @@ const qrUpload = multer({ storage: qrStorage, limits: { fileSize: 5 * 1024 * 102
 // ===== RESEED PLAYERS =====
 router.post('/reseed', adminAuth, async (req, res) => {
   try {
+    const hasKey = !!process.env.RAPIDAPI_KEY;
+    const hasHost = !!process.env.RAPIDAPI_HOST;
+    if (!hasKey || !hasHost) {
+      return res.status(500).json({
+        success: false,
+        message: `Missing env vars: ${!hasKey ? 'RAPIDAPI_KEY ' : ''}${!hasHost ? 'RAPIDAPI_HOST' : ''}`,
+      });
+    }
     const cricbuzz = require('../services/cricbuzz');
     const ok = await cricbuzz.seedIPLData();
-    res.json({ success: ok, message: ok ? 'Reseeded successfully' : 'Reseed failed' });
+    res.json({ success: ok, message: ok ? 'Reseeded successfully' : 'Reseed failed - check server logs' });
   } catch (error) {
-    res.status(500).json({ message: 'Reseed error', error: error.message });
+    console.error('Reseed error:', error);
+    res.status(500).json({ message: 'Reseed error', error: error.message, stack: error.stack });
   }
 });
 
