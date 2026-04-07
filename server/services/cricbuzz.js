@@ -1,7 +1,8 @@
 const Player = require('../models/Player');
 const Match = require('../models/Match');
 const Contest = require('../models/Contest');
-const { getAllPlayers, SQUADS } = require('../data/iplPlayers');
+const { getAllPlayers } = require('../data/iplPlayers');
+const { buildMatches } = require('../data/iplSchedule');
 
 const IPL_SERIES_ID = '9241';
 const API_HOST = process.env.RAPIDAPI_HOST;
@@ -144,38 +145,8 @@ const fetchPlayersFromScorecard = async (matchId, teamAName, teamBName) => {
   }
 };
 
-// Build a fallback schedule from the 10 IPL teams (round-robin) when API fails
-const buildFallbackSchedule = () => {
-  const teams = Object.keys(SQUADS);
-  const matches = [];
-  const baseDate = new Date();
-  baseDate.setHours(19, 30, 0, 0);
-  let day = 0;
-  let id = 100000;
-
-  for (let i = 0; i < teams.length; i++) {
-    for (let j = i + 1; j < teams.length; j++) {
-      const startTime = new Date(baseDate);
-      startTime.setDate(baseDate.getDate() + day);
-      day++;
-      matches.push({
-        apiId: `fallback-${id++}`,
-        title: `${teams[i]} vs ${teams[j]}`,
-        desc: `Match ${matches.length + 1}`,
-        teamA: teams[i],
-        teamB: teams[j],
-        league: 'Indian Premier League 2026',
-        startTime,
-        status: 'upcoming',
-        result: '',
-        scoreA: '',
-        scoreB: '',
-        venue: '',
-      });
-    }
-  }
-  return matches;
-};
+// Use the real IPL 2026 schedule as fallback when API fails
+const buildFallbackSchedule = () => buildMatches();
 
 // Main seeder: fetches all IPL data and populates DB
 const seedIPLData = async () => {
