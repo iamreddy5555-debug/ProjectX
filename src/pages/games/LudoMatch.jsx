@@ -228,7 +228,7 @@ export default function LudoMatch() {
     : 0;
 
   return (
-    <div className="main-content ludo-match-page" style={{ maxWidth: 720 }}>
+    <div className="main-content ludo-match-page" style={{ maxWidth: 1100 }}>
       <div className="game-page-header">
         <button className="btn btn-icon btn-secondary" onClick={() => navigate('/games')}>
           <ArrowLeft size={18} />
@@ -302,84 +302,115 @@ export default function LudoMatch() {
 
       {(status === 'in-match' || status === 'finished') && match && (
         <>
-          {/* Players panel */}
-          <div className="ludo-match-players">
-            {match.players.map((p, i) => {
-              const c = COLOR_MAP[p.color];
-              const isTurn = i === match.currentTurn && match.phase === 'playing';
-              const homeCount = p.pawns.filter(pn => pn.progress === FINISH).length;
-              return (
-                <div key={i} className={`ludo-match-player ${isTurn ? 'turn' : ''} ${p.rank === 1 ? 'winner' : ''}`}
-                  style={{ '--c': c.hex, '--soft': c.soft }}>
-                  <div className="ludo-match-player-dot" />
-                  <div className="ludo-match-player-info">
-                    <div className="ludo-match-player-name">
-                      {p.isBot && <Bot size={12} />} {p.name}
+          {/* Three-column layout: left panels | board | right panels */}
+          <div className="ludo-arena">
+            <div className="ludo-side ludo-side-left">
+              {match.players.map((p, i) => {
+                const c = COLOR_MAP[p.color];
+                const isTurn = i === match.currentTurn && match.phase === 'playing';
+                const homeCount = p.pawns.filter(pn => pn.progress === FINISH).length;
+                // Left side: green (top-left) + red (bottom-left) quadrants
+                if (p.color !== 'green' && p.color !== 'red') return null;
+                return (
+                  <div key={i} className={`ludo-match-player ${isTurn ? 'turn' : ''} ${p.rank === 1 ? 'winner' : ''}`}
+                    style={{ '--c': c.hex, '--soft': c.soft }}>
+                    <div className="ludo-match-player-dot" />
+                    <div className="ludo-match-player-info">
+                      <div className="ludo-match-player-name">
+                        {p.isBot && <Bot size={12} />} {p.name}
+                      </div>
+                      <div className="ludo-match-player-pos">{homeCount}/4 home</div>
                     </div>
-                    <div className="ludo-match-player-pos">{homeCount}/4 home</div>
+                    {p.rank && <span className="ludo-match-win-badge">#{p.rank}</span>}
                   </div>
-                  {p.rank && <span className="ludo-match-win-badge">#{p.rank}</span>}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
 
-          {/* Turn banner */}
-          {match.phase === 'playing' && (
-            <div className={`ludo-match-turnbar ${isMyTurn ? 'mine' : ''}`}>
-              {isMyTurn ? (
-                <>Your turn! <span>({turnSecondsLeft}s)</span> — {match.awaitingMove ? 'Pick a pawn to move' : 'Roll the dice'}</>
-              ) : (
-                <><span className="ludo-match-turn-color" style={{ background: COLOR_MAP[currentPlayer?.color]?.hex }} />
-                  <strong>{currentPlayer?.name}</strong>'s turn ({turnSecondsLeft}s)</>
+              {/* Turn banner on left column */}
+              {match.phase === 'playing' && (
+                <div className={`ludo-match-turnbar ${isMyTurn ? 'mine' : ''}`}>
+                  {isMyTurn ? (
+                    <>Your turn! <span>({turnSecondsLeft}s)</span></>
+                  ) : (
+                    <><span className="ludo-match-turn-color" style={{ background: COLOR_MAP[currentPlayer?.color]?.hex }} />
+                      <strong>{currentPlayer?.name}</strong> ({turnSecondsLeft}s)</>
+                  )}
+                </div>
+              )}
+
+              {/* Status hint */}
+              {match.phase === 'playing' && isMyTurn && match.awaitingMove && (
+                <div className="ludo-side-hint" style={{ color: COLOR_MAP[me?.color]?.hex, borderColor: COLOR_MAP[me?.color]?.hex }}>
+                  You rolled <strong>{match.awaitingMove.roll}</strong> — tap a glowing pawn
+                </div>
+              )}
+
+              {/* Last roll banner */}
+              {lastRollEvt && (
+                <div className="ludo-match-roll-flash" style={{ color: COLOR_MAP[lastRollEvt.color]?.hex }}>
+                  {lastRollEvt.color} rolled {lastRollEvt.roll}!
+                </div>
+              )}
+              {captureEvt && (
+                <div className="ludo-match-capture-banner">
+                  <span style={{ color: COLOR_MAP[captureEvt.by]?.hex }}>{captureEvt.by}</span> captured <span style={{ color: COLOR_MAP[captureEvt.victim]?.hex }}>{captureEvt.victim}</span>!
+                </div>
               )}
             </div>
-          )}
 
-          {/* The proper Ludo board */}
-          <LudoBoard match={match} me={me} isMyTurn={isMyTurn} onPickPawn={pickPawn} />
+            <div className="ludo-center-col">
+              <LudoBoard match={match} me={me} isMyTurn={isMyTurn} onPickPawn={pickPawn} />
+            </div>
 
-          {/* Action bar */}
-          {match.phase === 'playing' && isMyTurn && !match.awaitingMove && (
-            <button className="btn btn-primary btn-lg game-play-btn" onClick={roll} disabled={busy}>
-              <Dice5 size={18} /> Roll the Dice
-            </button>
-          )}
-          {match.phase === 'playing' && isMyTurn && match.awaitingMove && (
-            <div className="aviator-live-payout" style={{ color: COLOR_MAP[me?.color]?.hex, borderColor: COLOR_MAP[me?.color]?.hex }}>
-              You rolled <strong>{match.awaitingMove.roll}</strong> — click a highlighted pawn to move
-            </div>
-          )}
-          {match.phase === 'playing' && !isMyTurn && (
-            <div className="aviator-live-payout">Waiting for {currentPlayer?.name}...</div>
-          )}
-          {match.phase === 'finished' && (
-            <div className={`ludo-result ${match.winner && me && match.winner === me.color ? 'won' : 'lost'}`}>
-              <div className="ludo-result-winner">
-                Winner: <strong style={{ color: COLOR_MAP[match.winner]?.hex }}>{match.winner?.toUpperCase()}</strong>
-              </div>
-              <div className="ludo-result-payout">
-                {me && match.winner === me.color
-                  ? `You won ₹${finishedEvt?.payout || Math.floor(match.pot * 0.875)}! 🎉`
-                  : `You lost ₹${me?.stake || stake}`}
-              </div>
-              <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => { setStatus('idle'); setMatch(null); setFinishedEvt(null); refresh(); }}>
-                Play Again
-              </button>
-            </div>
-          )}
+            <div className="ludo-side ludo-side-right">
+              {match.players.map((p, i) => {
+                const c = COLOR_MAP[p.color];
+                const isTurn = i === match.currentTurn && match.phase === 'playing';
+                const homeCount = p.pawns.filter(pn => pn.progress === FINISH).length;
+                if (p.color !== 'yellow' && p.color !== 'blue') return null;
+                return (
+                  <div key={i} className={`ludo-match-player ${isTurn ? 'turn' : ''} ${p.rank === 1 ? 'winner' : ''}`}
+                    style={{ '--c': c.hex, '--soft': c.soft }}>
+                    <div className="ludo-match-player-dot" />
+                    <div className="ludo-match-player-info">
+                      <div className="ludo-match-player-name">
+                        {p.isBot && <Bot size={12} />} {p.name}
+                      </div>
+                      <div className="ludo-match-player-pos">{homeCount}/4 home</div>
+                    </div>
+                    {p.rank && <span className="ludo-match-win-badge">#{p.rank}</span>}
+                  </div>
+                );
+              })}
 
-          {/* Last roll + capture banners */}
-          {lastRollEvt && (
-            <div className="ludo-match-roll-flash" style={{ color: COLOR_MAP[lastRollEvt.color]?.hex }}>
-              {lastRollEvt.color} rolled {lastRollEvt.roll}!
+              {/* Roll button / action on right column */}
+              {match.phase === 'playing' && isMyTurn && !match.awaitingMove && (
+                <button className="btn btn-primary btn-lg ludo-side-roll" onClick={roll} disabled={busy}>
+                  <Dice5 size={18} /> Roll
+                </button>
+              )}
+              {match.phase === 'playing' && !isMyTurn && (
+                <div className="ludo-side-waiting">
+                  Waiting for<br /><strong>{currentPlayer?.name}</strong>...
+                </div>
+              )}
+              {match.phase === 'finished' && (
+                <div className={`ludo-result ${match.winner && me && match.winner === me.color ? 'won' : 'lost'}`}>
+                  <div className="ludo-result-winner">
+                    Winner: <strong style={{ color: COLOR_MAP[match.winner]?.hex }}>{match.winner?.toUpperCase()}</strong>
+                  </div>
+                  <div className="ludo-result-payout">
+                    {me && match.winner === me.color
+                      ? `You won ₹${finishedEvt?.payout || Math.floor(match.pot * 0.875)}! 🎉`
+                      : `You lost ₹${me?.stake || stake}`}
+                  </div>
+                  <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={() => { setStatus('idle'); setMatch(null); setFinishedEvt(null); refresh(); }}>
+                    Play Again
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-          {captureEvt && (
-            <div className="ludo-match-capture-banner">
-              <span style={{ color: COLOR_MAP[captureEvt.by]?.hex }}>{captureEvt.by}</span> captured <span style={{ color: COLOR_MAP[captureEvt.victim]?.hex }}>{captureEvt.victim}</span>!
-            </div>
-          )}
+          </div>
           {error && <div className="form-error-box" style={{ marginTop: 12 }}>{error}</div>}
         </>
       )}

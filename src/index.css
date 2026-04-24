@@ -4889,12 +4889,17 @@ a {
 .ludo-match-queue-timer { font-size: 0.85rem; color: var(--text-tertiary); }
 .ludo-match-queue-timer strong { color: var(--accent-primary); }
 
-/* Players panel */
+/* Players panel (legacy grid, still used when not in arena layout) */
 .ludo-match-players {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin-bottom: 14px;
+}
+
+/* In the side columns, players stack vertically and the cards can be a bit wider */
+.ludo-side .ludo-match-player {
+  padding: 12px 14px;
 }
 
 .ludo-match-player {
@@ -4986,18 +4991,89 @@ a {
   box-shadow: 0 0 6px currentColor;
 }
 
+/* ========== Ludo Match — one-screen 3-column arena ========== */
+.ludo-arena {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 220px;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.ludo-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: calc(var(--header-height) + 10px);
+  align-self: start;
+}
+
+.ludo-side-hint {
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ludo-side-roll {
+  width: 100%;
+  padding: 18px !important;
+  font-size: 1.1rem !important;
+  background: linear-gradient(180deg, #fbbf24, #d97706) !important;
+  color: var(--text-inverse) !important;
+  box-shadow: 0 6px 18px rgba(251, 191, 36, 0.35) !important;
+  animation: pawn-pulse 1.4s ease-in-out infinite;
+}
+
+.ludo-side-waiting {
+  padding: 16px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.ludo-center-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responsive: stack on narrow screens */
+@media (max-width: 960px) {
+  .ludo-arena {
+    grid-template-columns: 1fr;
+  }
+  .ludo-side {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .ludo-side .ludo-match-player { flex: 1 1 45%; }
+  .ludo-side-roll { font-size: 1rem !important; padding: 14px !important; }
+}
+
 /* ========== Proper Ludo board v3 (4 pawns per player) ========== */
 .ludo-board-v3 {
   position: relative;
-  margin: 0 auto 14px;
-  max-width: 580px;
+  margin: 0 auto;
+  max-width: 520px;
 }
 
 .ludo-board-dice {
   display: flex;
   justify-content: center;
-  margin-top: 12px;
+  margin-top: 8px;
 }
+
+.ludo-board-dice .ludo-dice { width: 64px; height: 64px; padding: 8px; }
 
 .ludo-grid-v2 {
   position: relative;
