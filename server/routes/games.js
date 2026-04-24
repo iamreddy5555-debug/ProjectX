@@ -34,15 +34,31 @@ const creditUser = async (userId, amount) => {
   if (amount > 0) await User.findByIdAndUpdate(userId, { $inc: { balance: amount } });
 };
 
-// ===== COLOR / NUMBER GAME =====
-// Rules:
-//  - Red   : result in {1,3,7,9}   → 2x
-//  - Green : result in {2,4,6,8}   → 2x
-//  - Violet: result in {0,5}       → 4.5x
-//  - Exact number match 0-9        → 9x
-const colorFromNumber = (n) => {
-  if (n === 0 || n === 5) return 'violet';
-  if ([1, 3, 7, 9].includes(n)) return 'red';
+// ===== COLOR / NUMBER GAME (WinGo rules) =====
+// Number colors (each ball can have primary + secondary):
+//   0 → Red + Violet
+//   5 → Green + Violet
+//   2, 4, 6, 8 → Red
+//   1, 3, 7, 9 → Green
+//
+// Payouts:
+//   Red   → 2x on {2,4,6,8}, 1.5x on 0
+//   Green → 2x on {1,3,7,9}, 1.5x on 5
+//   Violet → 4.5x on {0, 5}
+//   Big    → 2x on {5,6,7,8,9}
+//   Small  → 2x on {0,1,2,3,4}
+//   Exact number → 9x
+const colorsOfNumber = (n) => {
+  if (n === 0) return ['red', 'violet'];
+  if (n === 5) return ['green', 'violet'];
+  if ([2, 4, 6, 8].includes(n)) return ['red'];
+  return ['green']; // 1, 3, 7, 9
+};
+
+const primaryColor = (n) => {
+  if (n === 0) return 'red';       // displays red+violet, primary red
+  if (n === 5) return 'green';     // displays green+violet, primary green
+  if ([2, 4, 6, 8].includes(n)) return 'red';
   return 'green';
 };
 
@@ -52,22 +68,31 @@ router.post('/color', auth, async (req, res) => {
     if (!selection) return res.status(400).json({ message: 'Selection required' });
     const user = await getUserChecked(req.user.id, stake, 'color');
 
-    // Deduct stake
     user.balance -= stake;
     await user.save();
 
-    // Roll the result (0-9)
     const roll = Math.floor(Math.random() * 10);
-    const resultColor = colorFromNumber(roll);
+    const colors = colorsOfNumber(roll);
 
     // Determine win
     let multiplier = 0;
     if (/^[0-9]$/.test(selection)) {
-      // Number bet
       if (parseInt(selection, 10) === roll) multiplier = 9;
-    } else if (selection === 'red' && resultColor === 'red') multiplier = 2;
-    else if (selection === 'green' && resultColor === 'green') multiplier = 2;
-    else if (selection === 'violet' && resultColor === 'violet') multiplier = 4.5;
+    } else if (selection === 'red') {
+      if (roll === 0) multiplier = 1.5;                 // red+violet → partial
+      else if (colors.includes('red')) multiplier = 2;
+    } else if (selection === 'green') {
+      if (roll === 5) multiplier = 1.5;
+      else if (colors.includes('green')) multiplier = 2;
+    } else if (selection === 'violet') {
+      if (colors.includes('violet')) multiplier = 4.5;
+    } else if (selection === 'big') {
+      if (roll >= 5) multiplier = 2;
+    } else if (selection === 'small') {
+      if (roll <= 4) multiplier = 2;
+    } else {
+      return res.status(400).json({ message: 'Invalid selection' });
+    }
 
     const payout = Math.round(stake * multiplier * 100) / 100;
     const won = multiplier > 0;
@@ -77,7 +102,7 @@ router.post('/color', auth, async (req, res) => {
       gameType: 'color',
       selection,
       stake,
-      outcome: `${roll}:${resultColor}`,
+      outcome: `${roll}:${colors.join('+')}`,
       multiplier,
       payout,
       won,
@@ -88,7 +113,8 @@ router.post('/color', auth, async (req, res) => {
 
     res.json({
       roll,
-      resultColor,
+      resultColor: primaryColor(roll),
+      colors,
       won,
       multiplier,
       payout,
@@ -97,6 +123,24 @@ router.post('/color', auth, async (req, res) => {
     });
   } catch (err) {
     res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// Recent color game results (last 20) — public history for the UI
+router.get('/color/recent', async (req, res) => {
+  try {
+    const bets = await GameBet.find({ gameType: 'color', status: 'settled' })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('outcome createdAt');
+    const results = bets.map(b => {
+      const [numStr] = (b.outcome || '0').split(':');
+      const n = parseInt(numStr, 10);
+      return { number: n, colors: colorsOfNumber(n), at: b.createdAt };
+    });
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
