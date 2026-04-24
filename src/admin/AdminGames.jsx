@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
-import { Gamepad2, Palette, Coins, Plane, Users, TrendingUp, TrendingDown, RefreshCw, Zap } from 'lucide-react';
+import { Gamepad2, Palette, Coins, Plane, Users, TrendingUp, TrendingDown, RefreshCw, Zap, Pause, Play } from 'lucide-react';
 import api from '../utils/api';
+
+const POLL_INTERVAL = 4000; // 4 seconds
 
 const GAME_LABELS = {
   color:    { name: 'Color / Number', icon: Palette, color: '#a855f7' },
@@ -17,11 +19,39 @@ export default function AdminGames() {
   const [activeGame, setActiveGame] = useState('color');
   const [colorRollInput, setColorRollInput] = useState('');
   const [aviatorCrashInput, setAviatorCrashInput] = useState('');
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [livePaused, setLivePaused] = useState(false);
+  const [pulse, setPulse] = useState(false);
+  const pollRef = useRef(null);
 
-  useEffect(() => { loadAll(); }, []);
+  // Initial load + start polling
+  useEffect(() => {
+    loadAll(true);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
-  const loadAll = async () => {
-    setLoading(true);
+  // Manage polling interval based on pause state + tab visibility
+  useEffect(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (livePaused) return;
+
+    const tick = () => {
+      if (document.hidden) return; // pause when tab inactive
+      loadAll(false);
+    };
+    pollRef.current = setInterval(tick, POLL_INTERVAL);
+
+    // Refresh immediately when tab becomes visible again
+    const onVisibility = () => { if (!document.hidden && !livePaused) loadAll(false); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [livePaused]);
+
+  const loadAll = async (initial = false) => {
+    if (initial) setLoading(true);
     try {
       const [s, c] = await Promise.all([
         api.get('/admin/games/stats'),
@@ -29,12 +59,19 @@ export default function AdminGames() {
       ]);
       setStats(s.data);
       setControl(c.data);
+      setLastUpdate(new Date());
+      if (!initial) {
+        setPulse(true);
+        setTimeout(() => setPulse(false), 500);
+      }
     } catch (err) {
-      showToast('Failed to load');
+      if (initial) showToast('Failed to load');
     } finally {
-      setLoading(false);
+      if (initial) setLoading(false);
     }
   };
+
+  const secondsAgo = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / 1000) : null;
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
@@ -97,12 +134,32 @@ export default function AdminGames() {
     <div>
       <div className="admin-page-header">
         <div>
-          <h1 className="admin-page-title">Games Control</h1>
-          <p className="admin-page-subtitle">Per-game stats, top players, and rigging controls</p>
+          <h1 className="admin-page-title">
+            Games Control
+            <span className={`live-pill ${livePaused ? 'paused' : 'live'} ${pulse ? 'pulse' : ''}`}>
+              <span className="live-pill-dot" />
+              {livePaused ? 'PAUSED' : 'LIVE'}
+            </span>
+          </h1>
+          <p className="admin-page-subtitle">
+            Per-game stats, top players, and rigging controls
+            {lastUpdate && (
+              <span className="live-update-time"> · updated {secondsAgo}s ago</span>
+            )}
+          </p>
         </div>
-        <button className="btn btn-outline" onClick={loadAll}>
-          <RefreshCw size={16} /> Refresh
-        </button>
+        <div className="admin-header-actions">
+          <button
+            className="btn btn-outline"
+            onClick={() => setLivePaused(p => !p)}
+            title={livePaused ? 'Resume auto-refresh' : 'Pause auto-refresh'}
+          >
+            {livePaused ? <><Play size={14} /> Resume</> : <><Pause size={14} /> Pause</>}
+          </button>
+          <button className="btn btn-outline" onClick={() => loadAll(false)}>
+            <RefreshCw size={16} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Per-game summary cards */}

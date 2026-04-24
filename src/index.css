@@ -4748,6 +4748,56 @@ a {
 }
 
 /* ========== ADMIN GAMES PAGE ========== */
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  margin-left: 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  vertical-align: middle;
+  transition: all 0.3s;
+}
+
+.live-pill.live {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.live-pill.paused {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-warning);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.live-pill.pulse {
+  background: rgba(34, 197, 94, 0.3);
+  transform: scale(1.05);
+}
+
+.live-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+.live-pill.paused .live-pill-dot { animation: none; opacity: 0.7; }
+
+.live-update-time {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+
 .games-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
