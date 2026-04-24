@@ -5025,6 +5025,40 @@ a {
 }
 
 
+/* Game section tabs */
+.game-section-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.gst {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-bottom-width: 3px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  margin-bottom: -1px;
+}
+
+.gst:hover { color: var(--text-primary); }
+
+.gst.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
 .games-summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -5301,6 +5335,79 @@ a {
   border-radius: var(--radius-full);
   font-size: 0.7rem;
   font-weight: 800;
+}
+
+/* Dice control (Ludo) */
+.dice-control {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.dice-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.dice-row-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 70px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.dice-row-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.dice-chips {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.dice-chip {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: var(--bg-tertiary);
+  border: 1.5px solid var(--border-light);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dice-chip:hover { border-color: var(--accent-primary); }
+
+.dice-chip.selected {
+  background: var(--accent-warning-light);
+  border-color: var(--accent-warning);
+  color: var(--accent-warning);
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2);
+}
+
+.dice-chip.random {
+  font-style: italic;
+  color: var(--text-tertiary);
+}
+
+.dice-chip.random.selected {
+  background: var(--bg-tertiary);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+  box-shadow: none;
 }
 
 .top-tab:not(.active) .top-tab-count {

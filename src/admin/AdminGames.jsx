@@ -29,6 +29,7 @@ export default function AdminGames() {
   const [betsTab, setBetsTab] = useState('color');
   const [colorRollInput, setColorRollInput] = useState('');
   const [aviatorCrashInput, setAviatorCrashInput] = useState('');
+  const [section, setSection] = useState('overview'); // overview | color | coinflip | aviator | ludo
   const [lastUpdate, setLastUpdate] = useState(null);
   const [livePaused, setLivePaused] = useState(false);
   const [pulse, setPulse] = useState(false);
@@ -143,6 +144,28 @@ export default function AdminGames() {
     } catch (err) { showToast('Failed'); }
   };
 
+  const setLudoDice = async (color, value) => {
+    try {
+      const res = await api.patch('/admin/control', { nextLudoDice: { [color]: value } });
+      setControl(res.data);
+      if (value === 'clear' || value === null) {
+        showToast(`${color} dice → random`);
+      } else {
+        showToast(`${color} dice forced to ${value}`);
+      }
+    } catch (err) { showToast('Failed'); }
+  };
+
+  const clearAllLudoDice = async () => {
+    try {
+      const res = await api.patch('/admin/control', {
+        nextLudoDice: { red: 'clear', blue: 'clear', green: 'clear', yellow: 'clear' },
+      });
+      setControl(res.data);
+      showToast('All dice overrides cleared');
+    } catch (err) { showToast('Failed'); }
+  };
+
   const secondsAgo = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / 1000) : null;
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
@@ -234,9 +257,34 @@ export default function AdminGames() {
         </div>
       </div>
 
-      {/* Per-game summary cards */}
+      {/* Section tabs */}
+      <div className="game-section-tabs">
+        <button
+          className={`gst ${section === 'overview' ? 'active' : ''}`}
+          onClick={() => setSection('overview')}
+        >
+          <Gamepad2 size={14} /> All Games
+        </button>
+        {Object.entries(GAME_LABELS).map(([key, g]) => {
+          const Icon = g.icon;
+          return (
+            <button
+              key={key}
+              className={`gst ${section === key ? 'active' : ''}`}
+              onClick={() => { setSection(key); setBetsTab(key); setActiveGame(key); }}
+              style={section === key ? { color: g.color, borderColor: g.color } : {}}
+            >
+              <Icon size={14} /> {g.name}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Per-game summary cards — filtered by section */}
       <div className="games-summary-grid">
-        {Object.keys(GAME_LABELS).map(key => {
+        {Object.keys(GAME_LABELS)
+          .filter(key => section === 'overview' || section === key)
+          .map(key => {
           const g = GAME_LABELS[key];
           const s = summary[key] || { bets: 0, totalStake: 0, totalPayout: 0, housePL: 0, winRate: 0 };
           return (
@@ -283,6 +331,7 @@ export default function AdminGames() {
 
         <div className="control-grid">
           {/* Color control */}
+          {(section === 'overview' || section === 'color') && (
           <div className="control-card">
             <div className="control-head">
               <Palette size={18} style={{ color: '#a855f7' }} />
@@ -361,8 +410,10 @@ export default function AdminGames() {
               Clear override
             </button>
           </div>
+          )}
 
           {/* Aviator control */}
+          {(section === 'overview' || section === 'aviator') && (
           <div className="control-card">
             <div className="control-head">
               <Plane size={18} style={{ color: '#ef4444' }} />
@@ -410,14 +461,16 @@ export default function AdminGames() {
               Clear override
             </button>
           </div>
+          )}
 
-          {/* Ludo control */}
+          {/* Ludo control — winner + dice */}
+          {(section === 'overview' || section === 'ludo') && (
           <div className="control-card">
             <div className="control-head">
               <Dice5 size={18} style={{ color: '#22c55e' }} />
               <h3>Ludo Race</h3>
             </div>
-            <p className="control-desc">Force the next race winner. Pawn that wins pays 3.6×.</p>
+            <p className="control-desc">Force the winner AND/OR each color's dice value.</p>
 
             <div className="control-current">
               Current override:
@@ -458,9 +511,55 @@ export default function AdminGames() {
             </div>
 
             <button className="btn btn-danger btn-sm control-clear" onClick={() => setNextLudoWinner('clear')}>
-              Clear override
+              Clear winner override
             </button>
+
+            {/* Dice Control — per-color forced dice value */}
+            <div className="dice-control">
+              <div className="control-subhead" style={{ marginTop: 14 }}>
+                <Dice5 size={12} style={{ verticalAlign: '-2px' }} /> Dice Control (per color)
+              </div>
+              <p className="control-desc" style={{ marginTop: 0 }}>
+                Force a fixed dice value for each pawn. Higher number = faster = more likely to win.
+                Empty = random.
+              </p>
+
+              {LUDO_COLORS.map(c => {
+                const current = control?.nextLudoDice?.[c.id];
+                return (
+                  <div key={c.id} className="dice-row">
+                    <span className="dice-row-label" style={{ color: c.hex }}>
+                      <span className="dice-row-dot" style={{ background: c.hex }} />
+                      {c.id}
+                    </span>
+                    <div className="dice-chips">
+                      {[1,2,3,4,5,6].map(v => (
+                        <button
+                          key={v}
+                          className={`dice-chip ${current === v ? 'selected' : ''}`}
+                          onClick={() => setLudoDice(c.id, v)}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                      <button
+                        className={`dice-chip random ${!current ? 'selected' : ''}`}
+                        onClick={() => setLudoDice(c.id, 'clear')}
+                        title="Random (1-6)"
+                      >
+                        ?
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <button className="btn btn-danger btn-sm control-clear" onClick={clearAllLudoDice}>
+                Clear all dice overrides
+              </button>
+            </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -472,19 +571,21 @@ export default function AdminGames() {
         </h2>
 
         <div className="top-users-tabs">
-          {Object.keys(GAME_LABELS).map(key => {
-            const count = bets[key]?.length || 0;
-            return (
-              <button
-                key={key}
-                className={`top-tab ${betsTab === key ? 'active' : ''}`}
-                onClick={() => setBetsTab(key)}
-              >
-                {GAME_LABELS[key].name}
-                <span className="top-tab-count">{count}</span>
-              </button>
-            );
-          })}
+          {Object.keys(GAME_LABELS)
+            .filter(key => section === 'overview' || section === key)
+            .map(key => {
+              const count = bets[key]?.length || 0;
+              return (
+                <button
+                  key={key}
+                  className={`top-tab ${betsTab === key ? 'active' : ''}`}
+                  onClick={() => setBetsTab(key)}
+                >
+                  {GAME_LABELS[key].name}
+                  <span className="top-tab-count">{count}</span>
+                </button>
+              );
+            })}
         </div>
 
         <div className="admin-table-wrap">
@@ -550,15 +651,17 @@ export default function AdminGames() {
         <h2 className="admin-section-title"><Users size={18} /> Top Users by Game</h2>
 
         <div className="top-users-tabs">
-          {Object.keys(GAME_LABELS).map(key => (
-            <button
-              key={key}
-              className={`top-tab ${activeGame === key ? 'active' : ''}`}
-              onClick={() => setActiveGame(key)}
-            >
-              {GAME_LABELS[key].name}
-            </button>
-          ))}
+          {Object.keys(GAME_LABELS)
+            .filter(key => section === 'overview' || section === key)
+            .map(key => (
+              <button
+                key={key}
+                className={`top-tab ${activeGame === key ? 'active' : ''}`}
+                onClick={() => setActiveGame(key)}
+              >
+                {GAME_LABELS[key].name}
+              </button>
+            ))}
         </div>
 
         <div className="admin-table-wrap">

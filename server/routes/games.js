@@ -204,28 +204,36 @@ const LUDO_COLORS = ['red', 'blue', 'green', 'yellow'];
 const LUDO_PAYOUT = 3.6;
 const LUDO_TRACK_LENGTH = 50;
 
-const generateLudoRace = (winner) => {
+const generateLudoRace = (winner, forcedDice = {}) => {
   // Produce a sequence of turns; each turn rolls a die for each color.
   // At the end, the chosen winner must be the first to reach TRACK_LENGTH.
+  // forcedDice: { red?: 1-6, blue?: 1-6, green?: 1-6, yellow?: 1-6 } — those
+  // colors roll that exact value every turn instead of random.
   const positions = { red: 0, blue: 0, green: 0, yellow: 0 };
   const rolls = [];
   let safety = 60;
 
+  const rollForColor = (c) => {
+    if (forcedDice[c] && forcedDice[c] >= 1 && forcedDice[c] <= 6) {
+      return forcedDice[c];
+    }
+    // Winner gets a slightly better dice distribution so it finishes first
+    const max = c === winner ? 6 : 5;
+    const min = c === winner ? 2 : 1;
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  };
+
   while (positions[winner] < LUDO_TRACK_LENGTH && safety-- > 0) {
     const turn = {};
     for (const c of LUDO_COLORS) {
-      // Give the winner a slightly better dice distribution so it finishes first
-      const max = c === winner ? 6 : 5;
-      const min = c === winner ? 2 : 1;
-      const roll = Math.floor(Math.random() * (max - min + 1)) + min;
+      let roll = rollForColor(c);
       // Don't let non-winners overtake the winner
       const next = positions[c] + roll;
       if (c !== winner && next >= LUDO_TRACK_LENGTH) {
-        turn[c] = Math.max(1, LUDO_TRACK_LENGTH - 1 - positions[c]);
-      } else {
-        turn[c] = roll;
+        roll = Math.max(1, LUDO_TRACK_LENGTH - 1 - positions[c]);
       }
-      positions[c] += turn[c];
+      turn[c] = roll;
+      positions[c] += roll;
     }
     rolls.push(turn);
   }
@@ -246,20 +254,47 @@ router.post('/ludo', auth, async (req, res) => {
     user.balance -= stake;
     await user.save();
 
-    // Admin override for winner
+    // Admin overrides: force winner and/or dice-per-color
     const control = await AdminControl.getSingleton();
     let winner;
     if (control.nextLudoWinner && LUDO_COLORS.includes(control.nextLudoWinner)) {
       winner = control.nextLudoWinner;
       if (control.nextLudoMode === 'oneshot') {
         control.nextLudoWinner = null;
-        await control.save();
       }
     } else {
       winner = LUDO_COLORS[Math.floor(Math.random() * LUDO_COLORS.length)];
     }
 
-    const race = generateLudoRace(winner);
+    const forcedDice = {};
+    if (control.nextLudoDice) {
+      for (const c of LUDO_COLORS) {
+        const v = control.nextLudoDice[c];
+        if (v && v >= 1 && v <= 6) forcedDice[c] = v;
+      }
+    }
+
+    // If dice overrides are set, auto-recompute winner based on the forced speeds
+    // so the race result respects the dice. If admin explicitly forced a winner,
+    // that takes priority (the dice still apply but we patch the winner to finish).
+    if (!control.nextLudoWinner && Object.keys(forcedDice).length > 0) {
+      // Each color's effective speed ≈ its forced value (or avg 3.5 if random)
+      let bestSpeed = -1;
+      for (const c of LUDO_COLORS) {
+        const speed = forcedDice[c] || 3.5;
+        if (speed > bestSpeed) { bestSpeed = speed; winner = c; }
+      }
+    }
+
+    // One-shot clear dice after the race (persist cleared by admin if they choose)
+    if (control.nextLudoMode === 'oneshot' && Object.keys(forcedDice).length > 0) {
+      for (const c of LUDO_COLORS) {
+        if (control.nextLudoDice?.[c]) control.nextLudoDice[c] = null;
+      }
+    }
+    await control.save();
+
+    const race = generateLudoRace(winner, forcedDice);
     const won = selection === winner;
     const multiplier = won ? LUDO_PAYOUT : 0;
     const payout = won ? Math.round(stake * LUDO_PAYOUT * 100) / 100 : 0;

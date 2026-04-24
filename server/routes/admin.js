@@ -495,7 +495,7 @@ router.patch('/control', adminAuth, async (req, res) => {
       ctl.nextAviatorMode = nextAviatorMode;
     }
 
-    const { nextLudoWinner, nextLudoMode } = req.body;
+    const { nextLudoWinner, nextLudoMode, nextLudoDice } = req.body;
     if (nextLudoWinner === 'clear' || nextLudoWinner === null) {
       ctl.nextLudoWinner = null;
     } else if (['red', 'blue', 'green', 'yellow'].includes(nextLudoWinner)) {
@@ -505,6 +505,21 @@ router.patch('/control', adminAuth, async (req, res) => {
     }
     if (nextLudoMode && ['oneshot', 'persistent'].includes(nextLudoMode)) {
       ctl.nextLudoMode = nextLudoMode;
+    }
+    // Dice overrides: { red: 1-6 | null | 'clear', blue: ..., green: ..., yellow: ... }
+    if (nextLudoDice && typeof nextLudoDice === 'object') {
+      ctl.nextLudoDice = ctl.nextLudoDice || {};
+      for (const c of ['red', 'blue', 'green', 'yellow']) {
+        if (c in nextLudoDice) {
+          const v = nextLudoDice[c];
+          if (v === 'clear' || v === null) {
+            ctl.nextLudoDice[c] = null;
+          } else if (typeof v === 'number' && v >= 1 && v <= 6) {
+            ctl.nextLudoDice[c] = Math.floor(v);
+          }
+        }
+      }
+      ctl.markModified('nextLudoDice');
     }
 
     await ctl.save();

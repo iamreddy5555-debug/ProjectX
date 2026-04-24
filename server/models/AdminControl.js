@@ -22,6 +22,14 @@ const adminControlSchema = new mongoose.Schema({
   nextLudoMode: { type: String, enum: ['oneshot', 'persistent'], default: 'oneshot' },
   nextLudoSetBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   nextLudoSetAt: { type: Date },
+
+  // Force dice values per color. If set (1-6), that color rolls this value every turn.
+  nextLudoDice: {
+    red:    { type: Number, min: 1, max: 6, default: null },
+    blue:   { type: Number, min: 1, max: 6, default: null },
+    green:  { type: Number, min: 1, max: 6, default: null },
+    yellow: { type: Number, min: 1, max: 6, default: null },
+  },
 }, { timestamps: true, _id: false });
 
 adminControlSchema.statics.getSingleton = async function () {
