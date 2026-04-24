@@ -500,6 +500,18 @@ router.post('/ludo-match/roll', auth, async (req, res) => {
   }
 });
 
+// Pick one of the movable pawns after rolling (when multiple options)
+router.post('/ludo-match/pick', auth, async (req, res) => {
+  try {
+    const { matchId, pawnId } = req.body;
+    const result = await ludoMatch.pickPawn(matchId, req.user.id, pawnId);
+    if (!result.ok) return res.status(400).json({ message: result.error });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
+});
+
 // Current match for this user (or queue status if waiting)
 router.get('/ludo-match/current', auth, (req, res) => {
   const match = ludoMatch.getMatchForUser(req.user.id);
