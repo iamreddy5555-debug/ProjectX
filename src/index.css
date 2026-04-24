@@ -3354,63 +3354,231 @@ a {
   box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
-/* Aviator */
+/* Aviator — 3D plane flight */
 .aviator-screen {
   position: relative;
-  height: 320px;
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+  height: 340px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  isolation: isolate;
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.6);
+  perspective: 800px;
 }
 
-.aviator-bg {
+/* Sky layers */
+.aviator-sky {
   position: absolute;
   inset: 0;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 80% 70%, rgba(236, 72, 153, 0.15) 0%, transparent 50%);
+  background:
+    linear-gradient(180deg, #0b1027 0%, #1e3a8a 45%, #7c3aed 85%, #ec4899 100%);
+  transition: background 0.4s;
+  overflow: hidden;
 }
 
-.aviator-plane {
+.aviator-sky.sunset {
+  background:
+    linear-gradient(180deg, #1f2937 0%, #7f1d1d 55%, #b91c1c 100%);
+}
+
+.aviator-stars {
   position: absolute;
-  left: 10%;
-  bottom: 20%;
-  color: #fbbf24;
-  transition: transform 0.1s linear;
-  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.5));
+  inset: 0;
+  pointer-events: none;
+}
+
+.aviator-star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 4px rgba(255,255,255,0.8);
+  animation: star-twinkle 2s ease-in-out infinite;
+}
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+.aviator-clouds { position: absolute; inset: 0; pointer-events: none; }
+
+.aviator-cloud {
+  position: absolute;
+  background: radial-gradient(ellipse at center, rgba(255,255,255,0.25) 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(2px);
+}
+
+.aviator-cloud.c1 { width: 140px; height: 50px; top: 20%; left: 15%; }
+.aviator-cloud.c2 { width: 200px; height: 60px; top: 40%; left: 50%; }
+.aviator-cloud.c3 { width: 120px; height: 45px; top: 60%; left: 75%; }
+
+.aviator-cloud.moving.c1 { animation: cloud-float-1 18s linear infinite; }
+.aviator-cloud.moving.c2 { animation: cloud-float-2 24s linear infinite; }
+.aviator-cloud.moving.c3 { animation: cloud-float-3 20s linear infinite; }
+
+@keyframes cloud-float-1 {
+  from { transform: translateX(120%); }
+  to   { transform: translateX(-200%); }
+}
+@keyframes cloud-float-2 {
+  from { transform: translateX(120%); }
+  to   { transform: translateX(-250%); }
+}
+@keyframes cloud-float-3 {
+  from { transform: translateX(120%); }
+  to   { transform: translateX(-300%); }
+}
+
+/* Flight path line */
+.aviator-path-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.aviator-flight-line {
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6));
+  stroke-dasharray: 8 4;
+  animation: trail-dash 0.6s linear infinite;
+}
+
+.aviator-flight-line.crashed {
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.7));
+  animation: none;
+  stroke-dasharray: 4 4;
+}
+
+@keyframes trail-dash {
+  from { stroke-dashoffset: 12; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* Plane */
+.aviator-plane-wrap {
+  position: absolute;
+  z-index: 3;
+  transition: left 0.12s linear, top 0.12s linear, transform 0.2s ease-out;
+  transform-origin: center center;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+  animation: plane-bob 1.2s ease-in-out infinite;
+}
+
+.aviator-plane-wrap.falling {
+  animation: plane-crash 0.7s ease-in forwards;
+  filter: drop-shadow(0 0 18px rgba(239, 68, 68, 0.8));
+}
+
+.aviator-plane-wrap.cashed-out {
+  animation: plane-fly-out 0.8s ease-out forwards;
+}
+
+@keyframes plane-bob {
+  0%, 100% { transform: translate(-50%, -50%) rotate(var(--rot, -20deg)) translateY(0); }
+  50%      { transform: translate(-50%, -50%) rotate(var(--rot, -20deg)) translateY(-3px); }
+}
+
+@keyframes plane-crash {
+  0%   { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, 200%) rotate(120deg) scale(0.8); }
+}
+
+@keyframes plane-fly-out {
+  to { transform: translate(150%, -200%) rotate(-40deg) scale(0.6); opacity: 0; }
+}
+
+.aviator-plane-svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Propeller spin */
+.aviator-prop {
+  transform-origin: 85px 24px;
+  animation: prop-spin 0.08s linear infinite;
+}
+
+@keyframes prop-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Exhaust flame pulses */
+.aviator-flame {
+  animation: flame-pulse 0.15s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 6px rgba(251, 146, 60, 0.9));
+}
+
+@keyframes flame-pulse {
+  from { transform: scaleX(0.8); opacity: 0.7; }
+  to   { transform: scaleX(1.2); opacity: 1; }
+}
+
+/* Smoke trail behind plane */
+.aviator-trail {
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 180px;
+  height: 14px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25) 60%, rgba(251, 191, 36, 0.5));
+  border-radius: 20px;
+  filter: blur(4px);
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .aviator-multiplier {
-  position: relative;
-  z-index: 2;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
   text-align: center;
   color: white;
+  pointer-events: none;
 }
 
 .aviator-idle-text {
-  font-size: 1.2rem;
-  opacity: 0.7;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
 }
+
+.aviator-ready-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #fbbf24;
+  text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.aviator-ready-sub { font-size: 0.85rem; opacity: 0.75; }
 
 .aviator-mul-value {
   font-size: 4rem;
   font-weight: 900;
   letter-spacing: -2px;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+  text-shadow: 0 0 30px rgba(251, 191, 36, 0.6);
   transition: color 0.2s;
   color: #fbbf24;
+  display: block;
 }
 
-.aviator-mul-value.cashed { color: #10b981; }
-.aviator-mul-value.crashed { color: #ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, 0.5); }
+.aviator-mul-value.cashed { color: #10b981; text-shadow: 0 0 30px rgba(16, 185, 129, 0.6); }
+.aviator-mul-value.crashed { color: #ef4444; text-shadow: 0 0 30px rgba(239, 68, 68, 0.7); animation: crash-shake 0.25s linear 2; }
 
-.aviator-screen.crashed {
-  background: linear-gradient(180deg, #450a0a 0%, #7f1d1d 100%);
+@keyframes crash-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
 }
 
 .aviator-status {
