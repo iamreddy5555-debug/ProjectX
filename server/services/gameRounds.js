@@ -34,6 +34,16 @@ const state = {
   color:    { roundId: null, phase: 'betting', bettingEndsAt: null, revealAt: null, result: null, lastResults: [] },
   coinflip: { roundId: null, phase: 'betting', bettingEndsAt: null, revealAt: null, result: null, lastResults: [] },
   aviator:  { roundId: null, phase: 'waiting', startedAt: null, bettingEndsAt: null, crashPoint: null, lastCrashes: [] },
+  ludo: {
+    roundId: null,
+    phase: 'betting',              // betting | racing | revealing
+    bettingEndsAt: null,
+    positions: { red: 0, blue: 0, green: 0, yellow: 0 },
+    lastRoll: { red: 0, blue: 0, green: 0, yellow: 0 },
+    turnNumber: 0,
+    winner: null,
+    lastResults: [],               // [{ winner, at }]
+  },
 };
 
 let ioRef = null;
@@ -292,6 +302,156 @@ const publicAviatorState = () => {
   return { ...s, crashPoint: undefined };
 };
 
+// ============ LUDO (shared rounds) ============
+// Flow:  10s betting → racing (turns every 800ms) → 3s result → next round
+const LUDO_COLORS = ['red', 'blue', 'green', 'yellow'];
+const LUDO_BET_MS = 10_000;
+const LUDO_TURN_MS = 800;
+const LUDO_RESULT_MS = 4_000;
+const LUDO_TRACK = 50;
+const LUDO_PAYOUT = 3.6;
+
+const startLudoRound = async () => {
+  const now = Date.now();
+  const roundId = newRoundId('ludo');
+  const bettingEndsAt = new Date(now + LUDO_BET_MS);
+
+  await GameRound.create({
+    gameType: 'ludo', roundId, phase: 'betting',
+    startedAt: new Date(now), bettingEndsAt,
+  });
+
+  state.ludo = {
+    ...state.ludo,
+    roundId, phase: 'betting',
+    bettingEndsAt: bettingEndsAt.toISOString(),
+    positions: { red: 0, blue: 0, green: 0, yellow: 0 },
+    lastRoll: { red: 0, blue: 0, green: 0, yellow: 0 },
+    turnNumber: 0,
+    winner: null,
+  };
+  broadcast('ludo:round', state.ludo);
+
+  setTimeout(() => startLudoRacing(roundId), LUDO_BET_MS);
+};
+
+const startLudoRacing = async (roundId) => {
+  // Pick the forced winner (if admin set one) up front so we can bias ties.
+  // Dice overrides are re-read every turn so admin can change them live.
+  const initialControl = await AdminControl.getSingleton();
+  let forcedWinner = null;
+  if (initialControl.nextLudoWinner && LUDO_COLORS.includes(initialControl.nextLudoWinner)) {
+    forcedWinner = initialControl.nextLudoWinner;
+    if (initialControl.nextLudoMode === 'oneshot') {
+      initialControl.nextLudoWinner = null;
+      await initialControl.save();
+    }
+  }
+
+  state.ludo = { ...state.ludo, phase: 'racing', turnNumber: 0 };
+  broadcast('ludo:round', state.ludo);
+
+  const runTurn = async () => {
+    const st = state.ludo;
+    if (!st || st.roundId !== roundId) return; // round changed
+
+    // Re-read control each turn so admin can inject dice mid-race
+    const control = await AdminControl.getSingleton();
+    const forcedDice = (control.nextLudoDice || {});
+
+    const roll = {};
+    const newPositions = { ...st.positions };
+    for (const c of LUDO_COLORS) {
+      let v;
+      const forced = forcedDice[c];
+      if (typeof forced === 'number' && forced >= 1 && forced <= 6) {
+        v = forced;
+      } else if (forcedWinner === c) {
+        // Bias winner slightly higher (2-6) so it finishes first in absence of dice overrides
+        v = Math.floor(Math.random() * 5) + 2;
+      } else if (forcedWinner && c !== forcedWinner) {
+        // Slow down non-winners slightly
+        v = Math.floor(Math.random() * 5) + 1;
+      } else {
+        v = Math.floor(Math.random() * 6) + 1;
+      }
+      // Don't let non-forced-winners leapfrog the forced winner
+      if (forcedWinner && c !== forcedWinner) {
+        const next = newPositions[c] + v;
+        if (next >= LUDO_TRACK) v = Math.max(1, LUDO_TRACK - 1 - newPositions[c]);
+      }
+      roll[c] = v;
+      newPositions[c] = Math.min(LUDO_TRACK, newPositions[c] + v);
+    }
+
+    // Check for winner: first to reach LUDO_TRACK
+    const reached = LUDO_COLORS.filter(c => newPositions[c] >= LUDO_TRACK);
+    let winner = null;
+    if (reached.length > 0) {
+      if (forcedWinner && reached.includes(forcedWinner)) winner = forcedWinner;
+      else winner = reached[0];
+    }
+
+    state.ludo = {
+      ...state.ludo,
+      positions: newPositions,
+      lastRoll: roll,
+      turnNumber: st.turnNumber + 1,
+      winner,
+      phase: winner ? 'revealing' : 'racing',
+    };
+    broadcast('ludo:turn', {
+      roundId, turnNumber: state.ludo.turnNumber,
+      roll, positions: newPositions, winner,
+    });
+
+    if (winner) {
+      // Clear one-shot dice overrides
+      if (control.nextLudoMode === 'oneshot') {
+        let anyCleared = false;
+        for (const c of LUDO_COLORS) {
+          if (control.nextLudoDice?.[c]) {
+            control.nextLudoDice[c] = null;
+            anyCleared = true;
+          }
+        }
+        if (anyCleared) {
+          control.markModified('nextLudoDice');
+          await control.save();
+        }
+      }
+      await GameRound.findOneAndUpdate(
+        { roundId },
+        { phase: 'revealing', result: winner, settledAt: new Date() }
+      );
+      state.ludo = {
+        ...state.ludo,
+        lastResults: [{ winner, at: new Date().toISOString() }, ...state.ludo.lastResults].slice(0, 20),
+      };
+      broadcast('ludo:round', state.ludo);
+
+      // Settle all pending bets for this round
+      const pending = await GameBet.find({ gameType: 'ludo', roundId, status: 'pending' });
+      for (const bet of pending) {
+        const won = bet.selection === winner;
+        bet.status = 'settled';
+        bet.outcome = winner;
+        bet.multiplier = won ? LUDO_PAYOUT : 0;
+        bet.payout = won ? Math.round(bet.stake * LUDO_PAYOUT * 100) / 100 : 0;
+        bet.won = won;
+        await bet.save();
+        if (won) await User.findByIdAndUpdate(bet.userId, { $inc: { balance: bet.payout } });
+      }
+
+      setTimeout(startLudoRound, LUDO_RESULT_MS);
+    } else {
+      setTimeout(runTurn, LUDO_TURN_MS);
+    }
+  };
+
+  setTimeout(runTurn, 400); // small breath before first turn
+};
+
 // ============ Public state getters ============
 const getState = (gameType) => {
   if (gameType === 'aviator') return publicAviatorState();
@@ -305,7 +465,8 @@ const startAll = (io) => {
   startColorRound().catch(e => console.error('color loop error', e));
   startCoinflipRound().catch(e => console.error('coinflip loop error', e));
   startAviatorBetting().catch(e => console.error('aviator loop error', e));
-  console.log('🎰 Live game round scheduler started (color 30s, coinflip 90s, aviator continuous)');
+  startLudoRound().catch(e => console.error('ludo loop error', e));
+  console.log('🎰 Live round scheduler started (color 30s, coinflip 90s, aviator continuous, ludo ~15s)');
 };
 
 module.exports = {

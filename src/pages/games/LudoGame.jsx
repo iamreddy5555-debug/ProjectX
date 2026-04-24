@@ -2,22 +2,35 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
-import { ArrowLeft, Wallet, Dice5, Flag } from 'lucide-react';
+import { ArrowLeft, Wallet, Dice5 } from 'lucide-react';
 import api from '../../utils/api';
+import { onGameEvent } from '../../utils/gameSocket';
 
 const STAKES = [10, 50, 100, 500, 1000];
 const MIN_STAKE = 10;
 const MAX_STAKE = 10000;
 const PAYOUT = 3.6;
+const TRACK = 50;
 
 const COLORS = [
-  { id: 'red',    label: 'Red',    hex: '#ef4444', glow: 'rgba(239, 68, 68, 0.5)' },
-  { id: 'blue',   label: 'Blue',   hex: '#3b82f6', glow: 'rgba(59, 130, 246, 0.5)' },
-  { id: 'green',  label: 'Green',  hex: '#22c55e', glow: 'rgba(34, 197, 94, 0.5)' },
-  { id: 'yellow', label: 'Yellow', hex: '#fbbf24', glow: 'rgba(251, 191, 36, 0.5)' },
+  { id: 'red',    label: 'Red',    hex: '#ef4444', soft: '#fee2e2', pos: 'bottom-left' },
+  { id: 'blue',   label: 'Blue',   hex: '#3b82f6', soft: '#dbeafe', pos: 'bottom-right' },
+  { id: 'green',  label: 'Green',  hex: '#22c55e', soft: '#dcfce7', pos: 'top-left' },
+  { id: 'yellow', label: 'Yellow', hex: '#eab308', soft: '#fef9c3', pos: 'top-right' },
 ];
 
-const TRACK_LENGTH = 50;
+// Pattern of pips on a dice face for values 1-6
+const dicePips = (v) => {
+  const patterns = {
+    1: [[0,0,0],[0,1,0],[0,0,0]],
+    2: [[1,0,0],[0,0,0],[0,0,1]],
+    3: [[1,0,0],[0,1,0],[0,0,1]],
+    4: [[1,0,1],[0,0,0],[1,0,1]],
+    5: [[1,0,1],[0,1,0],[1,0,1]],
+    6: [[1,0,1],[1,0,1],[1,0,1]],
+  };
+  return patterns[v] || patterns[1];
+};
 
 export default function LudoGame() {
   const { user, updateBalance } = useAuth();
@@ -25,82 +38,87 @@ export default function LudoGame() {
 
   const [selection, setSelection] = useState(null);
   const [stake, setStake] = useState(10);
-  const [phase, setPhase] = useState('idle');   // idle | racing | result
-  const [positions, setPositions] = useState({ red: 0, blue: 0, green: 0, yellow: 0 });
-  const [currentRolls, setCurrentRolls] = useState({ red: 0, blue: 0, green: 0, yellow: 0 });
-  const [result, setResult] = useState(null);
+  const [placing, setPlacing] = useState(false);
+  const [round, setRound] = useState(null);
+  const [myBets, setMyBets] = useState([]);
   const [error, setError] = useState('');
-  const [recent, setRecent] = useState([]);
-  const timerRef = useRef(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [shakeColor, setShakeColor] = useState(null);
+  const tickRef = useRef(null);
 
-  useEffect(() => { loadRecent(); }, []);
+  // Fetch initial state + subscribe
+  useEffect(() => {
+    api.get('/games/ludo/current').then(r => setRound(r.data)).catch(() => {});
+    const offRound = onGameEvent('ludo:round', (r) => {
+      setRound(r);
+      if (r.phase === 'betting') { setMyBets([]); setSelection(null); }
+    });
+    const offTurn = onGameEvent('ludo:turn', (t) => {
+      setRound(prev => prev ? {
+        ...prev,
+        positions: t.positions,
+        lastRoll: t.roll,
+        turnNumber: t.turnNumber,
+        winner: t.winner,
+        phase: t.winner ? 'revealing' : 'racing',
+      } : prev);
+      // Shake the winning dice roll briefly
+      const maxRoll = Math.max(...Object.values(t.roll));
+      const topColor = Object.keys(t.roll).find(c => t.roll[c] === maxRoll);
+      setShakeColor(topColor);
+      setTimeout(() => setShakeColor(null), 400);
+    });
+    return () => { offRound(); offTurn(); };
+  }, []);
 
-  const loadRecent = async () => {
-    try {
-      const res = await api.get('/games/ludo/recent');
-      setRecent(res.data);
-    } catch {}
-  };
+  // Load my bets
+  useEffect(() => {
+    if (!round?.roundId || !user) return;
+    api.get('/games/ludo/my-bets').then(r => setMyBets(r.data || [])).catch(() => {});
+    if (round.phase === 'revealing') {
+      api.get('/auth/me').then(r => updateBalance(r.data.balance)).catch(() => {});
+    }
+  }, [round?.roundId, round?.phase, user]);
 
-  const play = async () => {
-    if (!selection) { setError('Pick a color to bet on'); return; }
+  // Countdown
+  useEffect(() => {
+    const target = round?.bettingEndsAt ? new Date(round.bettingEndsAt).getTime() : null;
+    if (!target || round?.phase !== 'betting') { setSecondsLeft(0); return; }
+    const tick = () => setSecondsLeft(Math.max(0, Math.ceil((target - Date.now()) / 1000)));
+    tick();
+    tickRef.current = setInterval(tick, 250);
+    return () => clearInterval(tickRef.current);
+  }, [round?.bettingEndsAt, round?.phase]);
+
+  const isBetting = round?.phase === 'betting' && secondsLeft > 0;
+  const racing = round?.phase === 'racing';
+  const revealing = round?.phase === 'revealing';
+
+  const placeBet = async () => {
+    if (!selection) { setError('Pick a color'); return; }
+    if (!isBetting) { setError('Betting closed'); return; }
     if ((user?.balance || 0) < stake) { setError('Insufficient balance'); return; }
     setError('');
-    setResult(null);
-    setPhase('racing');
-    setPositions({ red: 0, blue: 0, green: 0, yellow: 0 });
-
+    setPlacing(true);
     try {
       const res = await api.post('/games/ludo', { selection, stake });
       updateBalance(res.data.newBalance);
-
-      // Animate the race using the returned rolls sequence
-      const rolls = res.data.race.rolls;
-      let turn = 0;
-      const pos = { red: 0, blue: 0, green: 0, yellow: 0 };
-
-      const step = () => {
-        if (turn >= rolls.length) {
-          // Snap winner to full, reveal result
-          pos[res.data.winner] = TRACK_LENGTH;
-          setPositions({ ...pos });
-          setTimeout(() => {
-            setResult(res.data);
-            setPhase('result');
-            loadRecent();
-          }, 600);
-          return;
-        }
-        const roll = rolls[turn];
-        setCurrentRolls(roll);
-        for (const c of Object.keys(roll)) {
-          pos[c] = Math.min(TRACK_LENGTH, pos[c] + roll[c]);
-        }
-        setPositions({ ...pos });
-        turn++;
-        timerRef.current = setTimeout(step, 550);
-      };
-      step();
+      const mb = await api.get('/games/ludo/my-bets');
+      setMyBets(mb.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to play');
-      setPhase('idle');
+      setError(err.response?.data?.message || 'Failed to place bet');
+    } finally {
+      setPlacing(false);
     }
   };
 
-  const playAgain = () => {
-    clearTimeout(timerRef.current);
-    setPhase('idle');
-    setResult(null);
-    setSelection(null);
-    setPositions({ red: 0, blue: 0, green: 0, yellow: 0 });
-    setCurrentRolls({ red: 0, blue: 0, green: 0, yellow: 0 });
-  };
-
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+  const winner = round?.winner;
+  const positions = round?.positions || { red: 0, blue: 0, green: 0, yellow: 0 };
+  const lastRoll = round?.lastRoll || {};
+  const history = round?.lastResults || [];
 
   return (
     <div className="main-content ludo-page" style={{ maxWidth: 720 }}>
-      {/* Header */}
       <div className="game-page-header">
         <button className="btn btn-icon btn-secondary" onClick={() => navigate('/games')}>
           <ArrowLeft size={18} />
@@ -111,75 +129,101 @@ export default function LudoGame() {
         </div>
       </div>
 
-      {/* Recent winners */}
-      {recent.length > 0 && (
+      {/* Round status bar */}
+      <div className="coinflip-round-bar" style={{ marginBottom: 14 }}>
+        <div>
+          <div className="coinflip-phase">
+            {isBetting && 'Betting open'}
+            {racing && `Racing · Turn ${round?.turnNumber || 0}`}
+            {revealing && winner && `${winner.toUpperCase()} WINS!`}
+          </div>
+          <div className="coinflip-timer">
+            {isBetting ? `${secondsLeft}s` : racing ? '...' : '✓'}
+          </div>
+        </div>
+        <div className="coinflip-round-id">Round {round?.roundId?.slice(-8) || '—'}</div>
+      </div>
+
+      {/* Recent winners strip */}
+      {history.length > 0 && (
         <div className="ludo-recent">
           <span className="ludo-recent-label">Last:</span>
-          {recent.slice(0, 10).map((r, i) => {
+          {history.slice(0, 10).map((r, i) => {
             const c = COLORS.find(x => x.id === r.winner);
-            return <span key={i} className="ludo-recent-dot" style={{ background: c?.hex || '#888' }} />;
+            return <span key={i} className="ludo-recent-dot" style={{ background: c?.hex || '#888' }} title={r.winner} />;
           })}
         </div>
       )}
 
-      {/* Race track */}
-      <div className="ludo-board">
-        <div className="ludo-finish-line"><Flag size={14} /> Finish</div>
+      {/* The Ludo Board — 2x2 colored corners with big dice */}
+      <div className="ludo-board-v2">
         {COLORS.map(c => {
-          const isWinner = phase === 'result' && result?.winner === c.id;
-          const isLoser = phase === 'result' && result?.winner !== c.id;
-          const progress = Math.min(100, (positions[c.id] / TRACK_LENGTH) * 100);
+          const progress = Math.min(100, (positions[c.id] / TRACK) * 100);
+          const roll = lastRoll[c.id] || 0;
+          const isWinner = winner === c.id;
+          const isLoser = winner && winner !== c.id;
           return (
-            <div key={c.id} className={`ludo-lane ${isWinner ? 'winner' : ''} ${isLoser ? 'loser' : ''}`}>
-              <div className="ludo-lane-label" style={{ color: c.hex }}>{c.label}</div>
-              <div className="ludo-lane-track">
-                <div
-                  className="ludo-lane-fill"
-                  style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${c.hex}44, ${c.hex})` }}
-                />
-                <div
-                  className={`ludo-pawn ${phase === 'racing' ? 'racing' : ''}`}
-                  style={{
-                    left: `calc(${progress}% - 18px)`,
-                    background: `radial-gradient(circle at 30% 30%, #fff, ${c.hex})`,
-                    boxShadow: `0 0 12px ${c.glow}, inset 0 -3px 4px rgba(0,0,0,0.25)`,
-                  }}
-                />
-                {phase === 'racing' && currentRolls[c.id] > 0 && (
-                  <span className="ludo-dice-chip" style={{ color: c.hex, borderColor: c.hex }}>
-                    <Dice5 size={10} /> {currentRolls[c.id]}
-                  </span>
+            <div
+              key={c.id}
+              className={`ludo-corner ${c.pos} ${isWinner ? 'winner' : ''} ${isLoser ? 'loser' : ''}`}
+              style={{ '--c': c.hex, '--soft': c.soft }}
+            >
+              <div className={`ludo-dice ${shakeColor === c.id ? 'rolling' : ''}`}>
+                {roll > 0 ? (
+                  <div className="dice-face">
+                    {dicePips(roll).map((row, ri) => row.map((on, ci) => (
+                      <span key={`${ri}-${ci}`} className={`dice-pip ${on ? 'on' : ''}`} style={{ background: on ? c.hex : 'transparent' }} />
+                    )))}
+                  </div>
+                ) : (
+                  <div className="dice-face idle" style={{ color: c.hex }}>
+                    <Dice5 size={48} />
+                  </div>
                 )}
+              </div>
+              <div className="ludo-corner-label">{c.label}</div>
+              <div className="ludo-corner-track">
+                <div className="ludo-corner-fill" style={{ width: `${progress}%` }} />
+                <span className="ludo-corner-progress">{positions[c.id]}/{TRACK}</span>
               </div>
             </div>
           );
         })}
+
+        {/* Center cross decoration */}
+        <div className="ludo-center">
+          <div className="ludo-center-triangle t-top" />
+          <div className="ludo-center-triangle t-right" />
+          <div className="ludo-center-triangle t-bottom" />
+          <div className="ludo-center-triangle t-left" />
+        </div>
       </div>
 
-      {/* Result popup */}
-      {result && (
-        <div className={`ludo-result ${result.won ? 'won' : 'lost'}`}>
-          <div className="ludo-result-winner">
-            Winner: <strong style={{ color: COLORS.find(c => c.id === result.winner)?.hex }}>{result.winner.toUpperCase()}</strong>
-          </div>
-          <div className="ludo-result-payout">
-            {result.won ? `You won ₹${result.payout}!` : `You lost ₹${stake}`}
-          </div>
+      {/* My bets */}
+      {myBets.length > 0 && (
+        <div className="wingo-mybets">
+          <strong>Your bets:</strong>
+          {myBets.map(b => (
+            <span key={b._id} className="wingo-mybet-chip" style={{ textTransform: 'capitalize' }}>
+              {b.selection} · ₹{b.stake}
+              {b.status === 'settled' && (b.won ? ` · +₹${b.payout}` : ' · lost')}
+            </span>
+          ))}
         </div>
       )}
 
       {/* Controls */}
-      {phase === 'idle' && (
+      {isBetting && (
         <>
           <div className="game-section">
             <div className="game-section-title">Pick a color to win</div>
             <div className="ludo-color-grid">
               {COLORS.map(c => (
-                <button
-                  key={c.id}
+                <button key={c.id}
                   className={`ludo-color-btn ${selection === c.id ? 'selected' : ''}`}
-                  style={{ background: c.hex, '--glow': c.glow }}
+                  style={{ background: c.hex }}
                   onClick={() => setSelection(c.id)}
+                  disabled={placing}
                 >
                   {c.label}
                   <span className="ludo-color-payout">{PAYOUT}×</span>
@@ -192,7 +236,8 @@ export default function LudoGame() {
             <div className="game-section-title">Stake</div>
             <div className="game-stake-grid">
               {STAKES.map(s => (
-                <button key={s} className={`game-stake-btn ${stake === s ? 'selected' : ''}`} onClick={() => setStake(s)}>
+                <button key={s} className={`game-stake-btn ${stake === s ? 'selected' : ''}`}
+                  onClick={() => setStake(s)} disabled={placing}>
                   ₹{s}
                 </button>
               ))}
@@ -201,18 +246,10 @@ export default function LudoGame() {
               <label>Or enter custom:</label>
               <div className="custom-stake-input">
                 <span>₹</span>
-                <input
-                  type="number"
-                  min={MIN_STAKE}
-                  max={MAX_STAKE}
-                  step="1"
+                <input type="number" min={MIN_STAKE} max={MAX_STAKE} step="1"
                   value={stake}
-                  onChange={e => {
-                    const v = parseInt(e.target.value, 10);
-                    if (Number.isFinite(v)) setStake(v);
-                  }}
-                  placeholder={`${MIN_STAKE}-${MAX_STAKE}`}
-                />
+                  onChange={e => { const v = parseInt(e.target.value, 10); if (Number.isFinite(v)) setStake(v); }}
+                  disabled={placing} placeholder={`${MIN_STAKE}-${MAX_STAKE}`} />
               </div>
               <span className="custom-stake-hint">Win ₹{(stake * PAYOUT).toFixed(0)} • Min ₹{MIN_STAKE} • Max ₹{MAX_STAKE}</span>
             </div>
@@ -220,21 +257,22 @@ export default function LudoGame() {
 
           {error && <div className="form-error-box">{error}</div>}
 
-          <button className="btn btn-primary btn-lg game-play-btn" onClick={play} disabled={!selection}>
-            <Dice5 size={18} /> Roll the Dice — ₹{stake}
+          <button className="btn btn-primary btn-lg game-play-btn" onClick={placeBet}
+            disabled={!selection || placing || !isBetting}>
+            <Dice5 size={18} /> Bet ₹{stake}
           </button>
         </>
       )}
 
-      {phase === 'result' && (
-        <button className="btn btn-primary btn-lg game-play-btn" onClick={playAgain}>
-          Play Again
-        </button>
+      {racing && (
+        <div className="aviator-live-payout">
+          <Dice5 size={16} style={{ verticalAlign: '-3px' }} /> Race in progress — pawns moving...
+        </div>
       )}
 
-      {phase === 'racing' && (
-        <div className="ludo-racing-hint">
-          <Dice5 size={16} /> Racing... don't look away!
+      {revealing && (
+        <div className="aviator-live-payout">
+          Next race starting soon...
         </div>
       )}
     </div>

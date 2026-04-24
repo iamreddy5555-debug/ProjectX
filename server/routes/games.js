@@ -236,87 +236,55 @@ const generateLudoRace = (winner, forcedDice = {}) => {
   return { rolls, finalPositions: positions };
 };
 
+// Place a bet on the current shared Ludo race during its betting window.
 router.post('/ludo', auth, async (req, res) => {
   try {
     const { selection, stake } = req.body;
     if (!LUDO_COLORS.includes(selection)) {
       return res.status(400).json({ message: `Pick one of: ${LUDO_COLORS.join(', ')}` });
     }
-    const user = await getUserChecked(req.user.id, stake, 'ludo');
 
+    const cur = gameRounds.getState('ludo');
+    if (!cur.roundId || cur.phase !== 'betting') {
+      return res.status(400).json({ message: 'Betting is closed — wait for next race' });
+    }
+    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
+      return res.status(400).json({ message: 'Betting window just closed' });
+    }
+
+    const user = await getUserChecked(req.user.id, stake, 'ludo');
     user.balance -= stake;
     await user.save();
-
-    // Admin overrides: force winner and/or dice-per-color
-    const control = await AdminControl.getSingleton();
-    let winner;
-    if (control.nextLudoWinner && LUDO_COLORS.includes(control.nextLudoWinner)) {
-      winner = control.nextLudoWinner;
-      if (control.nextLudoMode === 'oneshot') {
-        control.nextLudoWinner = null;
-      }
-    } else {
-      winner = LUDO_COLORS[Math.floor(Math.random() * LUDO_COLORS.length)];
-    }
-
-    const forcedDice = {};
-    if (control.nextLudoDice) {
-      for (const c of LUDO_COLORS) {
-        const v = control.nextLudoDice[c];
-        if (v && v >= 1 && v <= 6) forcedDice[c] = v;
-      }
-    }
-
-    // If dice overrides are set, auto-recompute winner based on the forced speeds
-    // so the race result respects the dice. If admin explicitly forced a winner,
-    // that takes priority (the dice still apply but we patch the winner to finish).
-    if (!control.nextLudoWinner && Object.keys(forcedDice).length > 0) {
-      // Each color's effective speed ≈ its forced value (or avg 3.5 if random)
-      let bestSpeed = -1;
-      for (const c of LUDO_COLORS) {
-        const speed = forcedDice[c] || 3.5;
-        if (speed > bestSpeed) { bestSpeed = speed; winner = c; }
-      }
-    }
-
-    // One-shot clear dice after the race (persist cleared by admin if they choose)
-    if (control.nextLudoMode === 'oneshot' && Object.keys(forcedDice).length > 0) {
-      for (const c of LUDO_COLORS) {
-        if (control.nextLudoDice?.[c]) control.nextLudoDice[c] = null;
-      }
-    }
-    await control.save();
-
-    const race = generateLudoRace(winner, forcedDice);
-    const won = selection === winner;
-    const multiplier = won ? LUDO_PAYOUT : 0;
-    const payout = won ? Math.round(stake * LUDO_PAYOUT * 100) / 100 : 0;
 
     const bet = await GameBet.create({
       userId: user._id,
       gameType: 'ludo',
       selection,
       stake,
-      outcome: winner,
-      multiplier,
-      payout,
-      won,
+      roundId: cur.roundId,
+      status: 'pending',
     });
 
-    if (won) await creditUser(user._id, payout);
-    const freshUser = await User.findById(user._id).select('balance');
-
-    res.json({
-      winner,
-      race,               // { rolls: [...], finalPositions: {...} }
-      won,
-      multiplier,
-      payout,
-      bet,
-      newBalance: freshUser.balance,
-    });
+    res.json({ betId: bet._id, roundId: cur.roundId, newBalance: user.balance });
   } catch (err) {
     res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+router.get('/ludo/current', (req, res) => {
+  res.json(gameRounds.getState('ludo'));
+});
+
+router.get('/ludo/my-bets', auth, async (req, res) => {
+  try {
+    const cur = gameRounds.getState('ludo');
+    if (!cur.roundId) return res.json([]);
+    const bets = await GameBet.find({
+      userId: req.user.id, gameType: 'ludo', roundId: cur.roundId,
+    });
+    res.json(bets);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
