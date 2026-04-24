@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
-import { Ban, DollarSign, Search, Users, X } from 'lucide-react';
+import { Ban, DollarSign, Search, Users, X, Key } from 'lucide-react';
 import api from '../utils/api';
 
 export default function AdminUsers() {
@@ -32,6 +32,18 @@ export default function AdminUsers() {
       showToast('Balance updated');
     } catch (err) {
       showToast('Failed to update balance');
+    }
+  };
+
+  const resetPassword = async (userId, userName) => {
+    const newPwd = window.prompt(`Set new password for ${userName} (min 6 chars):`);
+    if (!newPwd) return;
+    if (newPwd.length < 6) { showToast('Password must be at least 6 characters'); return; }
+    try {
+      await api.patch(`/admin/users/${userId}/password`, { password: newPwd });
+      showToast(`Password reset for ${userName}`);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to reset password');
     }
   };
 
@@ -130,6 +142,9 @@ export default function AdminUsers() {
                     <div className="table-actions">
                       <button className="btn btn-outline btn-sm" onClick={() => { setEditingId(u._id); setNewBalance(String(u.balance)); }}>
                         <DollarSign size={14} /> Balance
+                      </button>
+                      <button className="btn btn-outline btn-sm" onClick={() => resetPassword(u._id, u.name)}>
+                        <Key size={14} /> Password
                       </button>
                       <button
                         className={`btn btn-sm ${u.banned ? 'btn-success' : 'btn-danger'}`}

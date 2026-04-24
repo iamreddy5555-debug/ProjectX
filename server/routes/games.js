@@ -2,6 +2,7 @@ const express = require('express');
 const GameBet = require('../models/GameBet');
 const User = require('../models/User');
 const AdminControl = require('../models/AdminControl');
+const gameRounds = require('../services/gameRounds');
 const { auth } = require('../middleware/auth');
 const router = express.Router();
 
@@ -64,78 +65,56 @@ const primaryColor = (n) => {
   return 'green';
 };
 
+// Place a bet on the CURRENT shared color round. Only valid during betting phase.
 router.post('/color', auth, async (req, res) => {
   try {
     const { selection, stake } = req.body;
     if (!selection) return res.status(400).json({ message: 'Selection required' });
-    const user = await getUserChecked(req.user.id, stake, 'color');
+    const allowed = ['red', 'green', 'violet', 'big', 'small', '0','1','2','3','4','5','6','7','8','9'];
+    if (!allowed.includes(selection)) return res.status(400).json({ message: 'Invalid selection' });
 
+    const cur = gameRounds.getState('color');
+    if (!cur.roundId || cur.phase !== 'betting') {
+      return res.status(400).json({ message: 'Betting is closed — wait for next round' });
+    }
+    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
+      return res.status(400).json({ message: 'Betting window just closed' });
+    }
+
+    const user = await getUserChecked(req.user.id, stake, 'color');
     user.balance -= stake;
     await user.save();
-
-    // Check admin override for next roll
-    const control = await AdminControl.getSingleton();
-    let roll;
-    if (control.nextColorRoll !== null && control.nextColorRoll !== undefined) {
-      roll = control.nextColorRoll;
-      if (control.nextColorMode === 'oneshot') {
-        control.nextColorRoll = null;
-        await control.save();
-      }
-    } else {
-      roll = Math.floor(Math.random() * 10);
-    }
-    const colors = colorsOfNumber(roll);
-
-    // Determine win
-    let multiplier = 0;
-    if (/^[0-9]$/.test(selection)) {
-      if (parseInt(selection, 10) === roll) multiplier = 9;
-    } else if (selection === 'red') {
-      if (roll === 0) multiplier = 1.5;                 // red+violet → partial
-      else if (colors.includes('red')) multiplier = 2;
-    } else if (selection === 'green') {
-      if (roll === 5) multiplier = 1.5;
-      else if (colors.includes('green')) multiplier = 2;
-    } else if (selection === 'violet') {
-      if (colors.includes('violet')) multiplier = 4.5;
-    } else if (selection === 'big') {
-      if (roll >= 5) multiplier = 2;
-    } else if (selection === 'small') {
-      if (roll <= 4) multiplier = 2;
-    } else {
-      return res.status(400).json({ message: 'Invalid selection' });
-    }
-
-    const payout = Math.round(stake * multiplier * 100) / 100;
-    const won = multiplier > 0;
 
     const bet = await GameBet.create({
       userId: user._id,
       gameType: 'color',
       selection,
       stake,
-      outcome: `${roll}:${colors.join('+')}`,
-      multiplier,
-      payout,
-      won,
+      roundId: cur.roundId,
+      status: 'pending',
     });
 
-    if (won) await creditUser(user._id, payout);
-    const freshUser = await User.findById(user._id).select('balance');
-
-    res.json({
-      roll,
-      resultColor: primaryColor(roll),
-      colors,
-      won,
-      multiplier,
-      payout,
-      bet,
-      newBalance: freshUser.balance,
-    });
+    res.json({ betId: bet._id, roundId: cur.roundId, newBalance: user.balance });
   } catch (err) {
     res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// Get current color round state (phase, seconds left, last results)
+router.get('/color/current', (req, res) => {
+  res.json(gameRounds.getState('color'));
+});
+
+router.get('/color/my-bets', auth, async (req, res) => {
+  try {
+    const cur = gameRounds.getState('color');
+    if (!cur.roundId) return res.json([]);
+    const bets = await GameBet.find({
+      userId: req.user.id, gameType: 'color', roundId: cur.roundId,
+    });
+    res.json(bets);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -157,41 +136,55 @@ router.get('/color/recent', async (req, res) => {
   }
 });
 
-// ===== COIN FLIP =====
-// 2x payout on win
+// ===== COIN FLIP (shared 90s rounds) =====
 router.post('/coinflip', auth, async (req, res) => {
   try {
     const { selection, stake } = req.body;
     if (!['heads', 'tails'].includes(selection)) {
       return res.status(400).json({ message: 'Selection must be heads or tails' });
     }
-    const user = await getUserChecked(req.user.id, stake, 'coinflip');
 
+    const cur = gameRounds.getState('coinflip');
+    if (!cur.roundId || cur.phase !== 'betting') {
+      return res.status(400).json({ message: 'Betting is closed — wait for next round' });
+    }
+    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
+      return res.status(400).json({ message: 'Betting window just closed' });
+    }
+
+    const user = await getUserChecked(req.user.id, stake, 'coinflip');
     user.balance -= stake;
     await user.save();
-
-    const outcome = Math.random() < 0.5 ? 'heads' : 'tails';
-    const won = selection === outcome;
-    const multiplier = won ? 2 : 0;
-    const payout = won ? stake * 2 : 0;
 
     const bet = await GameBet.create({
       userId: user._id,
       gameType: 'coinflip',
       selection,
       stake,
-      outcome,
-      multiplier,
-      payout,
-      won,
+      roundId: cur.roundId,
+      status: 'pending',
     });
 
-    if (won) await creditUser(user._id, payout);
-    const freshUser = await User.findById(user._id).select('balance');
-
-    res.json({ outcome, won, multiplier, payout, bet, newBalance: freshUser.balance });
+    res.json({ betId: bet._id, roundId: cur.roundId, newBalance: user.balance });
   } catch (err) {
     res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+router.get('/coinflip/current', (req, res) => {
+  res.json(gameRounds.getState('coinflip'));
+});
+
+router.get('/coinflip/my-bets', auth, async (req, res) => {
+  try {
+    const cur = gameRounds.getState('coinflip');
+    if (!cur.roundId) return res.json([]);
+    const bets = await GameBet.find({
+      userId: req.user.id, gameType: 'coinflip', roundId: cur.roundId,
+    });
+    res.json(bets);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
@@ -359,26 +352,29 @@ const generateCrashPoint = () => {
   return Math.max(1.0, Math.min(50, Math.round(raw * 100) / 100));
 };
 
+// Join the current shared aviator flight by placing a bet during the
+// betting window. Cash out during the flight to lock in the multiplier.
 router.post('/aviator/start', auth, async (req, res) => {
   try {
     const { stake } = req.body;
+    const cur = gameRounds.getState('aviator');
+    if (!cur.roundId || cur.phase !== 'waiting') {
+      return res.status(400).json({ message: 'Plane is already flying — wait for next round' });
+    }
+    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
+      return res.status(400).json({ message: 'Betting just closed' });
+    }
+
     const user = await getUserChecked(req.user.id, stake, 'aviator');
+
+    // Prevent double-betting same round
+    const already = await GameBet.findOne({
+      userId: user._id, gameType: 'aviator', roundId: cur.roundId, status: 'pending',
+    });
+    if (already) return res.status(400).json({ message: 'You already bet on this round' });
 
     user.balance -= stake;
     await user.save();
-
-    // Check admin override for crash point
-    const control = await AdminControl.getSingleton();
-    let crashPoint;
-    if (control.nextAviatorCrash !== null && control.nextAviatorCrash !== undefined) {
-      crashPoint = control.nextAviatorCrash;
-      if (control.nextAviatorMode === 'oneshot') {
-        control.nextAviatorCrash = null;
-        await control.save();
-      }
-    } else {
-      crashPoint = generateCrashPoint();
-    }
 
     const bet = await GameBet.create({
       userId: user._id,
@@ -386,12 +382,16 @@ router.post('/aviator/start', auth, async (req, res) => {
       selection: 'aviator',
       stake,
       status: 'pending',
-      crashPoint,
+      roundId: cur.roundId,
       startedAt: new Date(),
     });
 
-    res.json({ betId: bet._id, startedAt: bet.startedAt, newBalance: user.balance });
-    // NOTE: crashPoint is NOT returned to client — they must cash out blind
+    res.json({
+      betId: bet._id,
+      roundId: cur.roundId,
+      bettingEndsAt: cur.bettingEndsAt,
+      newBalance: user.balance,
+    });
   } catch (err) {
     res.status(err.code || 500).json({ message: err.message || 'Server error' });
   }
@@ -407,29 +407,23 @@ router.post('/aviator/cashout', auth, async (req, res) => {
     if (bet.gameType !== 'aviator') return res.status(400).json({ message: 'Not an aviator bet' });
     if (bet.status !== 'pending') return res.status(400).json({ message: 'Bet already settled' });
 
-    const currentMultiplier = aviatorMultiplierAt(bet.startedAt);
-    const cappedMultiplier = Math.round(currentMultiplier * 100) / 100;
-
-    if (cappedMultiplier >= bet.crashPoint) {
-      // Crashed — user loses
-      bet.status = 'settled';
-      bet.outcome = 'crashed';
-      bet.multiplier = bet.crashPoint;
-      bet.payout = 0;
-      bet.won = false;
-      await bet.save();
-      const freshUser = await User.findById(req.user.id).select('balance');
-      return res.json({
-        won: false,
-        crashed: true,
-        crashPoint: bet.crashPoint,
-        multiplier: bet.crashPoint,
-        payout: 0,
-        newBalance: freshUser.balance,
-      });
+    // Check the current shared flight state
+    const cur = gameRounds.getStateForSettle('aviator');
+    if (cur.roundId !== bet.roundId) {
+      return res.status(400).json({ message: 'Round already ended' });
+    }
+    if (cur.phase !== 'flying') {
+      return res.status(400).json({ message: 'Plane is not flying yet' });
     }
 
-    // Successful cashout
+    const elapsed = (Date.now() - new Date(cur.startedAt).getTime()) / 1000;
+    const currentMul = Math.max(1, Math.pow(1.06, elapsed));
+    // Safety check: if elapsed somehow exceeded crashPoint time, reject (should be caught by round settle)
+    if (currentMul >= cur.crashPoint) {
+      return res.status(400).json({ message: 'Too late — plane already crashed' });
+    }
+
+    const cappedMultiplier = Math.round(currentMul * 100) / 100;
     const payout = Math.round(bet.stake * cappedMultiplier * 100) / 100;
     bet.status = 'settled';
     bet.outcome = 'cashout';
@@ -443,10 +437,8 @@ router.post('/aviator/cashout', auth, async (req, res) => {
 
     res.json({
       won: true,
-      crashed: false,
       multiplier: cappedMultiplier,
       payout,
-      crashPoint: bet.crashPoint,
       newBalance: freshUser.balance,
     });
   } catch (err) {
@@ -454,36 +446,22 @@ router.post('/aviator/cashout', auth, async (req, res) => {
   }
 });
 
-// Check pending aviator bet (for page refresh resume)
-router.get('/aviator/pending', auth, async (req, res) => {
+// Current shared flight state
+router.get('/aviator/current', (req, res) => {
+  res.json(gameRounds.getState('aviator'));
+});
+
+// Has the current user already bet on the current round?
+router.get('/aviator/my-bet', auth, async (req, res) => {
   try {
+    const cur = gameRounds.getState('aviator');
+    if (!cur.roundId) return res.json({ bet: null });
     const bet = await GameBet.findOne({
       userId: req.user.id,
       gameType: 'aviator',
-      status: 'pending',
-    }).sort({ createdAt: -1 });
-    if (!bet) return res.json({ pending: false });
-
-    // If it's been too long (likely crashed already), auto-settle as crash
-    const now = Date.now();
-    const elapsed = (now - new Date(bet.startedAt).getTime()) / 1000;
-    const mul = Math.pow(1.06, elapsed);
-    if (mul >= bet.crashPoint) {
-      bet.status = 'settled';
-      bet.outcome = 'crashed';
-      bet.multiplier = bet.crashPoint;
-      bet.payout = 0;
-      bet.won = false;
-      await bet.save();
-      return res.json({ pending: false, crashed: true, crashPoint: bet.crashPoint });
-    }
-
-    res.json({
-      pending: true,
-      betId: bet._id,
-      stake: bet.stake,
-      startedAt: bet.startedAt,
+      roundId: cur.roundId,
     });
+    res.json({ bet });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

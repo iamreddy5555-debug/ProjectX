@@ -11,6 +11,10 @@ const adminControlSchema = new mongoose.Schema({
   nextColorSetBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   nextColorSetAt: { type: Date },
 
+  // Force next coin flip outcome
+  nextCoinflipOutcome: { type: String, enum: ['heads', 'tails', null], default: null },
+  nextCoinflipMode: { type: String, enum: ['oneshot', 'persistent'], default: 'oneshot' },
+
   // Force the next Aviator crash point. null = random.
   nextAviatorCrash: { type: Number, min: 1.0, max: 100, default: null },
   nextAviatorMode: { type: String, enum: ['oneshot', 'persistent'], default: 'oneshot' },

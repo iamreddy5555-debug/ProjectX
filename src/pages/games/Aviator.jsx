@@ -4,23 +4,22 @@ import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, Wallet } from 'lucide-react';
 import api from '../../utils/api';
+import { onGameEvent } from '../../utils/gameSocket';
 
 const STAKES = [10, 20, 50, 100, 500, 1000, 2000];
 const MIN_STAKE = 10;
 const MAX_STAKE = 10000;
 
-// Local multiplier from elapsed time — MUST match the server formula
-// Server: multiplier = 1.06^tSec
 const computeMultiplier = (startedAt) => {
+  if (!startedAt) return 1;
   const t = (Date.now() - new Date(startedAt).getTime()) / 1000;
   return Math.max(1, Math.pow(1.06, t));
 };
 
-// Color-code a crash multiplier for the history bar
 const crashColor = (m) => {
-  if (m < 2) return '#60a5fa';      // blue — low
-  if (m < 10) return '#c084fc';     // purple — medium
-  return '#fbbf24';                  // gold — big win
+  if (m < 2) return '#60a5fa';
+  if (m < 10) return '#c084fc';
+  return '#fbbf24';
 };
 
 export default function Aviator() {
@@ -28,93 +27,108 @@ export default function Aviator() {
   const navigate = useNavigate();
 
   const [stake, setStake] = useState(10);
-  const [phase, setPhase] = useState('idle');
-  const [betId, setBetId] = useState(null);
-  const [startedAt, setStartedAt] = useState(null);
+  const [round, setRound] = useState(null);          // shared flight state
+  const [myBet, setMyBet] = useState(null);          // my bet on current round
   const [currentMul, setCurrentMul] = useState(1.0);
-  const [lastResult, setLastResult] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [cashResult, setCashResult] = useState(null); // { multiplier, payout }
   const [error, setError] = useState('');
-  const [crashed, setCrashed] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [placing, setPlacing] = useState(false);
+  const [cashingOut, setCashingOut] = useState(false);
   const rafRef = useRef(null);
-  const cashingOut = useRef(false);
+  const tickRef = useRef(null);
 
-  // Resume pending bet
+  // Socket + initial state
   useEffect(() => {
-    api.get('/games/aviator/pending').then(res => {
-      if (res.data.pending) {
-        setBetId(res.data.betId);
-        setStartedAt(res.data.startedAt);
-        setStake(res.data.stake);
-        setPhase('flying');
+    api.get('/games/aviator/current').then(r => setRound(r.data)).catch(() => {});
+    const off = onGameEvent('aviator:state', (s) => {
+      setRound(s);
+      // New flight starting — reset local state
+      if (s.phase === 'waiting') {
+        setCashResult(null);
       }
-    }).catch(() => {});
-    loadHistory();
+      if (s.phase === 'crashed') {
+        // Refresh my bet and balance
+        api.get('/games/aviator/my-bet').then(r => setMyBet(r.data?.bet || null)).catch(() => {});
+        api.get('/auth/me').then(r => updateBalance(r.data.balance)).catch(() => {});
+      }
+    });
+    return off;
   }, []);
 
-  const loadHistory = async () => {
-    try {
-      const res = await api.get('/games/aviator/crashes');
-      setHistory(res.data);
-    } catch {}
-  };
-
+  // Fetch my bet on each round change
   useEffect(() => {
-    if (phase !== 'flying' || !startedAt) return;
+    if (!round?.roundId || !user) { setMyBet(null); return; }
+    api.get('/games/aviator/my-bet').then(r => setMyBet(r.data?.bet || null)).catch(() => {});
+  }, [round?.roundId, user]);
+
+  // Countdown ticker (for betting phase)
+  useEffect(() => {
+    const target = round?.bettingEndsAt ? new Date(round.bettingEndsAt).getTime() : null;
+    if (!target || round?.phase !== 'waiting') { setSecondsLeft(0); return; }
+    const tick = () => setSecondsLeft(Math.max(0, Math.ceil((target - Date.now()) / 1000)));
+    tick();
+    tickRef.current = setInterval(tick, 250);
+    return () => clearInterval(tickRef.current);
+  }, [round?.bettingEndsAt, round?.phase]);
+
+  // Multiplier animation while flying
+  useEffect(() => {
+    if (round?.phase !== 'flying' || !round?.startedAt) { setCurrentMul(1.0); return; }
     const tick = () => {
-      setCurrentMul(computeMultiplier(startedAt));
+      setCurrentMul(computeMultiplier(round.startedAt));
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, startedAt]);
+  }, [round?.phase, round?.startedAt]);
 
-  const startFlight = async () => {
+  const canBet = round?.phase === 'waiting' && secondsLeft > 0 && !myBet;
+
+  const placeBet = async () => {
     if ((user?.balance || 0) < stake) { setError('Insufficient balance'); return; }
     setError('');
-    setLastResult(null);
-    setCrashed(false);
+    setPlacing(true);
     try {
       const res = await api.post('/games/aviator/start', { stake });
       updateBalance(res.data.newBalance);
-      setBetId(res.data.betId);
-      setStartedAt(res.data.startedAt);
-      setCurrentMul(1.0);
-      setPhase('flying');
+      // Refresh my bet
+      const r = await api.get('/games/aviator/my-bet');
+      setMyBet(r.data?.bet || null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to start');
+      setError(err.response?.data?.message || 'Failed to place bet');
+    } finally {
+      setPlacing(false);
     }
   };
 
   const cashout = async () => {
-    if (cashingOut.current || phase !== 'flying') return;
-    cashingOut.current = true;
+    if (!myBet || myBet.status !== 'pending' || cashingOut) return;
+    setCashingOut(true);
     try {
-      const res = await api.post('/games/aviator/cashout', { betId });
+      const res = await api.post('/games/aviator/cashout', { betId: myBet._id });
       updateBalance(res.data.newBalance);
-      setLastResult(res.data);
-      setCrashed(res.data.crashed);
-      setPhase('result');
-      cancelAnimationFrame(rafRef.current);
-      loadHistory();
+      setCashResult({ multiplier: res.data.multiplier, payout: res.data.payout });
+      // Mark my bet as settled locally
+      setMyBet(prev => prev ? { ...prev, status: 'settled', won: true, multiplier: res.data.multiplier, payout: res.data.payout } : prev);
     } catch (err) {
       setError(err.response?.data?.message || 'Cashout failed');
     } finally {
-      cashingOut.current = false;
+      setCashingOut(false);
     }
   };
 
-  const playAgain = () => {
-    setPhase('idle');
-    setBetId(null);
-    setStartedAt(null);
-    setCurrentMul(1.0);
-    setLastResult(null);
-    setCrashed(false);
-    loadHistory();
-  };
+  const phase = round?.phase;
+  const crashed = phase === 'crashed';
+  const flying = phase === 'flying';
+  const waiting = phase === 'waiting';
 
-  const displayMul = phase === 'result' && lastResult ? lastResult.multiplier : currentMul;
+  const displayMul = flying ? currentMul : (crashed ? round?.crashPoint : 1.0);
+
+  const iCashedOut = cashResult || (myBet?.status === 'settled' && myBet?.won);
+  const iLost = myBet?.status === 'settled' && !myBet?.won;
+
+  const history = round?.lastCrashes || [];
 
   return (
     <div className="main-content aviator-page" style={{ maxWidth: 760 }}>
@@ -130,7 +144,6 @@ export default function Aviator() {
         </div>
       </div>
 
-      {/* Crash history bar */}
       {history.length > 0 && (
         <div className="crash-history-bar">
           {history.map((h, i) => (
@@ -141,40 +154,49 @@ export default function Aviator() {
         </div>
       )}
 
-      {/* Game screen */}
-      <div className={`aviator-screen ${phase === 'flying' ? 'flying' : ''} ${crashed ? 'crashed' : ''}`}>
+      <div className={`aviator-screen ${flying ? 'flying' : ''} ${crashed ? 'crashed' : ''}`}>
         <AviatorSky crashed={crashed} />
         <AxisDots />
 
-        {phase !== 'idle' && <FlightPath currentMul={currentMul} crashed={crashed} />}
+        {flying && <FlightPath currentMul={currentMul} crashed={false} />}
+        {crashed && <FlightPath currentMul={round.crashPoint || 1} crashed={true} />}
 
-        {/* Multiplier sits in the middle, BEHIND the plane */}
         <div className="aviator-multiplier">
-          {phase === 'idle' ? (
+          {waiting ? (
             <div className="aviator-idle-text">
-              <span className="aviator-ready-title">Waiting for bet</span>
+              <span className="aviator-ready-title">Next flight in {secondsLeft}s</span>
+              {myBet ? (
+                <span className="aviator-ready-sub">You bet ₹{myBet.stake} — wait for takeoff</span>
+              ) : (
+                <span className="aviator-ready-sub">Place your bet now</span>
+              )}
             </div>
           ) : (
             <>
-              <span className={`aviator-mul-value ${crashed ? 'crashed' : phase === 'result' ? 'cashed' : ''}`}>
-                {displayMul.toFixed(2)}x
+              <span className={`aviator-mul-value ${crashed ? 'crashed' : iCashedOut ? 'cashed' : ''}`}>
+                {Number(displayMul || 1).toFixed(2)}x
               </span>
-              {phase === 'result' && (
-                <div className={`aviator-status ${lastResult?.won ? 'won' : 'lost'}`}>
-                  {lastResult?.won
-                    ? <>Cashed out @ {lastResult.multiplier.toFixed(2)}× — ₹{lastResult.payout}</>
-                    : <>FLEW AWAY @ {lastResult?.crashPoint?.toFixed(2)}× — Lost ₹{stake}</>}
+              {crashed && (
+                <div className={`aviator-status ${iCashedOut ? 'won' : iLost ? 'lost' : ''}`}>
+                  {iCashedOut ? (
+                    <>Cashed out @ {(cashResult?.multiplier || myBet?.multiplier).toFixed(2)}× — +₹{cashResult?.payout || myBet?.payout}</>
+                  ) : iLost ? (
+                    <>FLEW AWAY @ {round.crashPoint.toFixed(2)}× — lost ₹{myBet.stake}</>
+                  ) : (
+                    <>FLEW AWAY @ {round.crashPoint.toFixed(2)}×</>
+                  )}
                 </div>
               )}
             </>
           )}
         </div>
 
-        {phase !== 'idle' && <PlaneShape phase={phase} currentMul={currentMul} crashed={crashed} />}
+        {flying && <PlaneShape currentMul={currentMul} crashed={false} />}
+        {crashed && <PlaneShape currentMul={round.crashPoint || 1} crashed={true} />}
       </div>
 
-      {/* Controls */}
-      {phase === 'idle' && (
+      {/* Controls by phase */}
+      {waiting && !myBet && (
         <>
           <div className="game-section">
             <div className="game-section-title">Stake</div>
@@ -189,18 +211,10 @@ export default function Aviator() {
               <label>Or enter custom:</label>
               <div className="custom-stake-input">
                 <span>₹</span>
-                <input
-                  type="number"
-                  min={MIN_STAKE}
-                  max={MAX_STAKE}
-                  step="1"
+                <input type="number" min={MIN_STAKE} max={MAX_STAKE} step="1"
                   value={stake}
-                  onChange={e => {
-                    const v = parseInt(e.target.value, 10);
-                    if (Number.isFinite(v)) setStake(v);
-                  }}
-                  placeholder={`${MIN_STAKE}-${MAX_STAKE}`}
-                />
+                  onChange={e => { const v = parseInt(e.target.value, 10); if (Number.isFinite(v)) setStake(v); }}
+                  placeholder={`${MIN_STAKE}-${MAX_STAKE}`} />
               </div>
               <span className="custom-stake-hint">Min ₹{MIN_STAKE} • Max ₹{MAX_STAKE}</span>
             </div>
@@ -208,50 +222,63 @@ export default function Aviator() {
 
           {error && <div className="form-error-box">{error}</div>}
 
-          <button className="btn btn-primary btn-lg game-play-btn aviator-bet-btn" onClick={startFlight}>
-            BET ₹{stake}
+          <button className="btn btn-primary btn-lg game-play-btn" onClick={placeBet} disabled={placing || !canBet}>
+            {placing ? 'Placing...' : `Bet ₹${stake}`}
           </button>
         </>
       )}
 
-      {phase === 'flying' && (
+      {waiting && myBet && (
+        <div className="aviator-live-payout">
+          Bet locked in — waiting for takeoff ({secondsLeft}s)
+        </div>
+      )}
+
+      {flying && myBet?.status === 'pending' && (
         <>
           <div className="aviator-live-payout">
-            Current payout: <strong>₹{(stake * currentMul).toFixed(0)}</strong>
+            Current payout: <strong>₹{(myBet.stake * currentMul).toFixed(0)}</strong>
           </div>
-          <button className="btn btn-danger btn-lg game-play-btn aviator-cashout-btn" onClick={cashout}>
-            CASH OUT @ {currentMul.toFixed(2)}× — ₹{(stake * currentMul).toFixed(0)}
+          <button className="btn btn-danger btn-lg game-play-btn aviator-cashout-btn"
+            onClick={cashout} disabled={cashingOut}>
+            Cash Out @ {currentMul.toFixed(2)}× — ₹{(myBet.stake * currentMul).toFixed(0)}
           </button>
         </>
       )}
 
-      {phase === 'result' && (
-        <button className="btn btn-primary btn-lg game-play-btn aviator-bet-btn" onClick={playAgain}>
-          Play Again
-        </button>
+      {flying && (!myBet || myBet.status !== 'pending') && (
+        <div className="aviator-live-payout">
+          Plane is flying — betting on next flight
+        </div>
+      )}
+
+      {crashed && (
+        <div className="aviator-live-payout">
+          Next flight starting soon...
+        </div>
       )}
     </div>
   );
 }
 
-// Map multiplier to normalized path coords (0..1)
+// ----- Reuse existing sub-components -----
 function pathCoords(mul, crashed) {
   const progress = Math.min(1, 1 - 1 / (0.8 + mul));
-  const x = 0.06 + progress * 0.88;  // 6% -> 94%
-  const y = 0.88 - progress * 0.72;  // 88% -> 16%
+  const x = 0.06 + progress * 0.88;
+  const y = 0.88 - progress * 0.72;
   if (crashed) return { x: Math.min(0.95, x + 0.05), y: Math.min(0.98, y + 0.40), rot: 60 };
   const rot = -26 + progress * 14;
   return { x, y, rot };
 }
 
-function PlaneShape({ phase, currentMul, crashed }) {
+function PlaneShape({ currentMul, crashed }) {
   const { x, y, rot } = pathCoords(currentMul, crashed);
   return (
     <div
-      className={`aviator-plane-wrap ${phase === 'result' && !crashed ? 'cashed-out' : ''} ${crashed ? 'falling' : ''}`}
+      className={`aviator-plane-wrap ${crashed ? 'falling' : ''}`}
       style={{ left: `${x * 100}%`, top: `${y * 100}%`, transform: `translate(-50%, -50%) rotate(${rot}deg)` }}
     >
-      <svg className="aviator-plane-svg" width="86" height="42" viewBox="0 0 86 42" xmlns="http://www.w3.org/2000/svg">
+      <svg className="aviator-plane-svg" width="86" height="42" viewBox="0 0 86 42">
         <defs>
           <linearGradient id="redBody" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#fca5a5" />
@@ -263,26 +290,13 @@ function PlaneShape({ phase, currentMul, crashed }) {
             <stop offset="100%" stopColor="#991b1b" />
           </linearGradient>
         </defs>
-
-        {/* Rear fuselage / tail */}
         <path d="M 4 21 L 14 10 L 20 12 L 22 21 L 20 30 L 14 32 Z" fill="url(#redWing)" stroke="#450a0a" strokeWidth="0.6" />
-
-        {/* Main body */}
         <ellipse cx="50" cy="21" rx="34" ry="7" fill="url(#redBody)" stroke="#450a0a" strokeWidth="0.7" />
-
-        {/* Top wing */}
         <path d="M 36 21 L 52 6 L 60 7 L 56 21 Z" fill="url(#redWing)" stroke="#450a0a" strokeWidth="0.6" />
-        {/* Bottom wing */}
         <path d="M 36 21 L 52 36 L 60 35 L 56 21 Z" fill="#991b1b" stroke="#450a0a" strokeWidth="0.6" opacity="0.92" />
-
-        {/* Cockpit window */}
         <ellipse cx="62" cy="18" rx="8" ry="3" fill="#1e293b" stroke="#0f172a" strokeWidth="0.5" />
         <ellipse cx="62" cy="17" rx="5" ry="1" fill="rgba(255,255,255,0.35)" />
-
-        {/* Nose cone */}
         <path d="M 80 21 L 86 20 L 86 22 Z" fill="#450a0a" />
-
-        {/* Propeller hub */}
         <circle cx="80" cy="21" r="2" fill="#450a0a" />
         <g className="aviator-prop">
           <ellipse cx="80" cy="21" rx="0.8" ry="7" fill="rgba(255,255,255,0.45)" />
@@ -295,23 +309,14 @@ function PlaneShape({ phase, currentMul, crashed }) {
 function FlightPath({ currentMul, crashed }) {
   const { x, y } = pathCoords(currentMul, crashed);
   const startX = 0.06, startY = 0.88;
-
-  // Quadratic bezier via the curve's lower control point for a nice arc
   const cx = (startX + x) / 2;
   const cy = startY;
-
-  // SVG viewBox uses 0..100
   const toVB = (v) => (v * 100).toFixed(2);
-
   const curve = `M ${toVB(startX)} ${toVB(startY)} Q ${toVB(cx)} ${toVB(cy)}, ${toVB(x)} ${toVB(y)}`;
   const fillPath = `${curve} L ${toVB(x)} 100 L ${toVB(startX)} 100 Z`;
 
   return (
-    <svg
-      className="aviator-path-svg"
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-    >
+    <svg className="aviator-path-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
       <defs>
         <linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="rgba(239, 68, 68, 0.55)" />
@@ -319,14 +324,8 @@ function FlightPath({ currentMul, crashed }) {
         </linearGradient>
       </defs>
       <path d={fillPath} fill="url(#curveFill)" />
-      <path
-        d={curve}
-        stroke={crashed ? '#f87171' : '#ef4444'}
-        strokeWidth="0.6"
-        fill="none"
-        strokeLinecap="round"
-        style={{ filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.8))' }}
-      />
+      <path d={curve} stroke={crashed ? '#f87171' : '#ef4444'} strokeWidth="0.6" fill="none" strokeLinecap="round"
+        style={{ filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.8))' }} />
     </svg>
   );
 }
@@ -336,17 +335,10 @@ function AviatorSky({ crashed }) {
 }
 
 function AxisDots() {
-  // 8 dots along bottom, 8 along left
-  const bottomDots = Array.from({ length: 8 }, (_, i) => i);
-  const leftDots = Array.from({ length: 7 }, (_, i) => i);
   return (
     <>
-      <div className="axis-row axis-bottom">
-        {bottomDots.map(i => <span key={i} className="axis-dot" />)}
-      </div>
-      <div className="axis-row axis-left">
-        {leftDots.map(i => <span key={i} className="axis-dot" />)}
-      </div>
+      <div className="axis-row axis-bottom">{Array.from({ length: 8 }, (_, i) => <span key={i} className="axis-dot" />)}</div>
+      <div className="axis-row axis-left">{Array.from({ length: 7 }, (_, i) => <span key={i} className="axis-dot" />)}</div>
     </>
   );
 }

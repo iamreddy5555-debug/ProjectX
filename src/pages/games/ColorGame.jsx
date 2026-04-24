@@ -4,13 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, Wallet, Shuffle, HelpCircle } from 'lucide-react';
 import api from '../../utils/api';
-
-const MODES = [
-  { id: '30sec', label: 'WinGo', sub: '30sec', seconds: 30 },
-  { id: '1min',  label: 'WinGo', sub: '1 Min',  seconds: 60 },
-  { id: '3min',  label: 'WinGo', sub: '3 Min',  seconds: 180 },
-  { id: '5min',  label: 'WinGo', sub: '5 Min',  seconds: 300 },
-];
+import { onGameEvent } from '../../utils/gameSocket';
 
 const MULTIPLIERS = [1, 5, 10, 20, 50, 100];
 const BASE_STAKE = 10;
@@ -22,11 +16,9 @@ const colorsOfNumber = (n) => {
   return ['green'];
 };
 
-// Ball styling based on a number's colors
 const ballStyle = (n) => {
   const cs = colorsOfNumber(n);
   if (cs.length === 2) {
-    // Split ball — two colors diagonally
     const [c1, c2] = cs;
     const map = { red: '#ef4444', green: '#22c55e', violet: '#a855f7' };
     return { background: `linear-gradient(135deg, ${map[c1]} 0%, ${map[c1]} 50%, ${map[c2]} 50%, ${map[c2]} 100%)` };
@@ -40,82 +32,90 @@ export default function ColorGame() {
   const { user, updateBalance } = useAuth();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState('30sec');
   const [multiplier, setMultiplier] = useState(1);
   const [selection, setSelection] = useState(null);
-  const [playing, setPlaying] = useState(false);
-  const [result, setResult] = useState(null);
+  const [placing, setPlacing] = useState(false);
+  const [round, setRound] = useState(null);        // { roundId, phase, bettingEndsAt, revealAt, result, lastResults }
+  const [myBets, setMyBets] = useState([]);        // pending bets on this round
+  const [lastResult, setLastResult] = useState(null);
   const [error, setError] = useState('');
-  const [recent, setRecent] = useState([]);
-  const [secondsLeft, setSecondsLeft] = useState(30);
-  const [roundId, setRoundId] = useState(Date.now().toString());
-  const timerRef = useRef(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const tickRef = useRef(null);
 
-  const modeCfg = MODES.find(m => m.id === mode);
   const stake = BASE_STAKE * multiplier;
 
-  useEffect(() => { loadRecent(); }, []);
-
-  // Cosmetic countdown — resets every mode interval
+  // Initial state + subscribe to round events
   useEffect(() => {
-    const total = modeCfg.seconds;
-    setSecondsLeft(total);
-    setRoundId(`${Date.now()}`.slice(0, 13));
-    clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setSecondsLeft(s => {
-        if (s <= 1) {
-          setRoundId(`${Date.now()}`.slice(0, 13));
-          return total;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [mode]);
+    api.get('/games/color/current').then(r => setRound(r.data)).catch(() => {});
+    const off = onGameEvent('color:round', (r) => {
+      setRound(r);
+      if (r.phase === 'betting') {
+        // new round — clear old bets + last result
+        setMyBets([]);
+        setLastResult(null);
+      }
+    });
+    const offResult = onGameEvent('color:result', (r) => setLastResult(r));
+    return () => { off(); offResult(); };
+  }, []);
 
-  const loadRecent = async () => {
-    try {
-      const res = await api.get('/games/color/recent');
-      setRecent(res.data);
-    } catch {}
-  };
+  // Load my bets whenever the round changes
+  useEffect(() => {
+    if (!round?.roundId || !user) return;
+    api.get('/games/color/my-bets').then(r => setMyBets(r.data || [])).catch(() => {});
+    // Refresh balance after settle (when result arrives)
+    if (round.phase === 'revealing') {
+      api.get('/auth/me').then(r => updateBalance(r.data.balance)).catch(() => {});
+    }
+  }, [round?.roundId, round?.phase, user]);
 
-  const play = async () => {
+  // Countdown tick
+  useEffect(() => {
+    const target = round?.bettingEndsAt ? new Date(round.bettingEndsAt).getTime() : null;
+    if (!target) { setSecondsLeft(0); return; }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+      setSecondsLeft(left);
+    };
+    tick();
+    tickRef.current = setInterval(tick, 250);
+    return () => clearInterval(tickRef.current);
+  }, [round?.bettingEndsAt]);
+
+  const isBetting = round?.phase === 'betting' && secondsLeft > 0;
+
+  const placeBet = async () => {
     if (!selection) { setError('Pick a color, number, or big/small'); return; }
+    if (!isBetting) { setError('Betting is closed — wait for next round'); return; }
     if ((user?.balance || 0) < stake) { setError('Insufficient balance'); return; }
     setError('');
-    setPlaying(true);
-    setResult(null);
+    setPlacing(true);
     try {
       const res = await api.post('/games/color', { selection, stake });
-      setTimeout(() => {
-        setResult(res.data);
-        updateBalance(res.data.newBalance);
-        setPlaying(false);
-        loadRecent();
-      }, 1200);
+      updateBalance(res.data.newBalance);
+      // Refresh my bets
+      const mb = await api.get('/games/color/my-bets');
+      setMyBets(mb.data || []);
+      setSelection(null);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to play');
-      setPlaying(false);
+      setError(err.response?.data?.message || 'Failed to place bet');
+    } finally {
+      setPlacing(false);
     }
   };
 
   const pickRandom = () => {
     const opts = ['red', 'green', 'violet', 'big', 'small', '0','1','2','3','4','5','6','7','8','9'];
     setSelection(opts[Math.floor(Math.random() * opts.length)]);
-    const mOpts = MULTIPLIERS.filter(m => m <= 20);
-    setMultiplier(mOpts[Math.floor(Math.random() * mOpts.length)]);
   };
-
-  const closeResult = () => { setResult(null); setSelection(null); };
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
   const ss = String(secondsLeft % 60).padStart(2, '0');
+  const lastResults = round?.lastResults || [];
+  const revealing = round?.phase === 'revealing';
 
   return (
     <div className="main-content wingo-page" style={{ maxWidth: 620 }}>
-      {/* Header */}
       <div className="wingo-header">
         <button className="btn btn-icon btn-secondary" onClick={() => navigate('/games')}>
           <ArrowLeft size={18} />
@@ -126,103 +126,80 @@ export default function ColorGame() {
         </div>
       </div>
 
-      {/* Deposit / Withdraw row */}
       <div className="wingo-wallet-row">
         <button className="wingo-wd-btn withdraw" onClick={() => navigate('/wallet')}>Withdraw</button>
         <button className="wingo-wd-btn deposit" onClick={() => navigate('/wallet')}>Deposit</button>
       </div>
 
-      {/* Marquee banner */}
       <div className="wingo-marquee">
         <span className="wingo-marquee-icon">📢</span>
-        <span className="wingo-marquee-text">🎉 🎁 🎉 Welcome to CricketX — pick your lucky number and win up to 9× instantly!</span>
+        <span className="wingo-marquee-text">🎉 Live shared WinGo rounds — everyone plays the same round!</span>
         <button className="wingo-marquee-detail">Detail</button>
       </div>
 
-      {/* Mode tabs */}
-      <div className="wingo-modes">
-        {MODES.map(m => (
-          <button
-            key={m.id}
-            className={`wingo-mode ${mode === m.id ? 'active' : ''}`}
-            onClick={() => setMode(m.id)}
-          >
-            <div className="wingo-mode-icon">⏱</div>
-            <div className="wingo-mode-label">{m.label}</div>
-            <div className="wingo-mode-sub">{m.sub}</div>
-          </button>
-        ))}
-      </div>
-
-      {/* Round info card — always open 24/7 */}
+      {/* Round info card */}
       <div className="wingo-round">
         <div className="wingo-round-left">
           <button className="wingo-howto"><HelpCircle size={14} /> How to play</button>
-          <div className="wingo-round-title">WinGo {modeCfg.sub}</div>
+          <div className="wingo-round-title">WinGo 30sec</div>
           <div className="wingo-recent">
-            {recent.slice(0, 5).map((r, i) => (
+            {lastResults.slice(0, 5).map((r, i) => (
               <span key={i} className="wingo-recent-ball" style={ballStyle(r.number)}>
                 <span>{r.number}</span>
               </span>
             ))}
-            {recent.length === 0 && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>No history yet</span>}
+            {lastResults.length === 0 && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>No history yet</span>}
           </div>
         </div>
         <div className="wingo-round-right">
-          <div className="wingo-timer-label">Time remaining</div>
+          <div className="wingo-timer-label">{revealing ? 'Revealing' : 'Time remaining'}</div>
           <div className="wingo-timer">
             <span>{mm[0]}</span><span>{mm[1]}</span>
             <span className="wingo-timer-sep">:</span>
             <span>{ss[0]}</span><span>{ss[1]}</span>
           </div>
-          <div className="wingo-round-id">{roundId}</div>
+          <div className="wingo-round-id">{round?.roundId || '—'}</div>
         </div>
       </div>
 
-      {/* Result popup */}
-      {result && (
-        <div className={`wingo-result ${result.won ? 'won' : 'lost'}`}>
-          <div className="wingo-result-ball" style={ballStyle(result.roll)}><span>{result.roll}</span></div>
+      {/* Reveal popup */}
+      {revealing && round?.result && (
+        <div className="wingo-result won">
+          <div className="wingo-result-ball" style={ballStyle(round.result.number)}><span>{round.result.number}</span></div>
           <div className="wingo-result-text">
-            <div className="wingo-result-title">{result.won ? `You won ₹${result.payout}!` : 'You lost'}</div>
-            <div className="wingo-result-sub">
-              Rolled {result.roll} ({result.colors?.join(' + ')})
-              {result.won && ` • ${result.multiplier}× payout`}
-            </div>
+            <div className="wingo-result-title">Round result: {round.result.number}</div>
+            <div className="wingo-result-sub">Colors: {round.result.colors?.join(' + ')}</div>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={closeResult}>OK</button>
         </div>
       )}
 
-      {/* Color picker (3 pills) */}
+      {/* My bets on this round */}
+      {myBets.length > 0 && (
+        <div className="wingo-mybets">
+          <strong>Your bets this round:</strong>
+          {myBets.map(b => (
+            <span key={b._id} className="wingo-mybet-chip">
+              {b.selection} · ₹{b.stake}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Color picker */}
       <div className="wingo-colors">
-        <button
-          className={`wingo-color-pill green ${selection === 'green' ? 'selected' : ''}`}
-          onClick={() => setSelection('green')}
-          disabled={playing}
-        >Green</button>
-        <button
-          className={`wingo-color-pill violet ${selection === 'violet' ? 'selected' : ''}`}
-          onClick={() => setSelection('violet')}
-          disabled={playing}
-        >Violet</button>
-        <button
-          className={`wingo-color-pill red ${selection === 'red' ? 'selected' : ''}`}
-          onClick={() => setSelection('red')}
-          disabled={playing}
-        >Red</button>
+        <button className={`wingo-color-pill green ${selection === 'green' ? 'selected' : ''}`}
+          onClick={() => setSelection('green')} disabled={!isBetting || placing}>Green</button>
+        <button className={`wingo-color-pill violet ${selection === 'violet' ? 'selected' : ''}`}
+          onClick={() => setSelection('violet')} disabled={!isBetting || placing}>Violet</button>
+        <button className={`wingo-color-pill red ${selection === 'red' ? 'selected' : ''}`}
+          onClick={() => setSelection('red')} disabled={!isBetting || placing}>Red</button>
       </div>
 
       {/* Number balls */}
       <div className="wingo-balls">
         {[0,1,2,3,4,5,6,7,8,9].map(n => (
-          <button
-            key={n}
-            className={`wingo-ball ${selection === String(n) ? 'selected' : ''}`}
-            style={ballStyle(n)}
-            onClick={() => setSelection(String(n))}
-            disabled={playing}
-          >
+          <button key={n} className={`wingo-ball ${selection === String(n) ? 'selected' : ''}`}
+            style={ballStyle(n)} onClick={() => setSelection(String(n))} disabled={!isBetting || placing}>
             <span>{n}</span>
           </button>
         ))}
@@ -230,69 +207,29 @@ export default function ColorGame() {
 
       {/* Multiplier chips */}
       <div className="wingo-mults">
-        <button className="wingo-mult random" onClick={pickRandom} disabled={playing}>
+        <button className="wingo-mult random" onClick={pickRandom} disabled={!isBetting || placing}>
           <Shuffle size={12} /> Random
         </button>
         {MULTIPLIERS.map(m => (
-          <button
-            key={m}
-            className={`wingo-mult ${multiplier === m ? 'selected' : ''}`}
-            onClick={() => setMultiplier(m)}
-            disabled={playing}
-          >
-            X{m}
-          </button>
+          <button key={m} className={`wingo-mult ${multiplier === m ? 'selected' : ''}`}
+            onClick={() => setMultiplier(m)} disabled={!isBetting || placing}>X{m}</button>
         ))}
       </div>
 
       {/* Big / Small */}
       <div className="wingo-bigsmall">
-        <button
-          className={`wingo-bigsmall-btn big ${selection === 'big' ? 'selected' : ''}`}
-          onClick={() => setSelection('big')}
-          disabled={playing}
-        >Big</button>
-        <button
-          className={`wingo-bigsmall-btn small ${selection === 'small' ? 'selected' : ''}`}
-          onClick={() => setSelection('small')}
-          disabled={playing}
-        >Small</button>
+        <button className={`wingo-bigsmall-btn big ${selection === 'big' ? 'selected' : ''}`}
+          onClick={() => setSelection('big')} disabled={!isBetting || placing}>Big</button>
+        <button className={`wingo-bigsmall-btn small ${selection === 'small' ? 'selected' : ''}`}
+          onClick={() => setSelection('small')} disabled={!isBetting || placing}>Small</button>
       </div>
 
       {error && <div className="form-error-box">{error}</div>}
 
-      {/* Play button */}
-      <button
-        className="btn btn-primary btn-lg wingo-play-btn"
-        onClick={play}
-        disabled={!selection || playing}
-      >
-        {playing ? 'Rolling...' : `Play ₹${stake}`}
+      <button className="btn btn-primary btn-lg wingo-play-btn" onClick={placeBet}
+        disabled={!selection || !isBetting || placing}>
+        {placing ? 'Placing...' : isBetting ? `Place Bet ₹${stake}` : 'Betting closed — next round soon'}
       </button>
-
-      {/* History tabs */}
-      <div className="wingo-history-tabs">
-        <button className="wingo-htab active">Game History</button>
-        <button className="wingo-htab">Chart</button>
-        <button className="wingo-htab">My History</button>
-      </div>
-      <div className="wingo-history-list">
-        <div className="wingo-history-head">
-          <span>Period</span><span>Number</span><span>Big/Small</span><span>Color</span>
-        </div>
-        {recent.slice(0, 10).map((r, i) => (
-          <div key={i} className="wingo-history-row">
-            <span className="wingo-hrow-period">#{i + 1}</span>
-            <span className="wingo-hrow-num" style={ballStyle(r.number)}>{r.number}</span>
-            <span className="wingo-hrow-bs">{r.number >= 5 ? 'Big' : 'Small'}</span>
-            <span className="wingo-hrow-colors">
-              {r.colors.map(c => (
-                <span key={c} className={`wingo-dot ${c}`} />
-              ))}
-            </span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

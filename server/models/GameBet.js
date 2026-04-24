@@ -13,6 +13,8 @@ const gameBetSchema = new mongoose.Schema({
   // Aviator-only fields
   crashPoint: { type: Number },
   startedAt: { type: Date },
+  // Shared-round reference (color / coinflip / aviator — not ludo)
+  roundId: { type: String, index: true },
 }, { timestamps: true });
 
 module.exports = mongoose.model('GameBet', gameBetSchema);

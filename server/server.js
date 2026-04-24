@@ -117,6 +117,16 @@ const startServer = async () => {
     if (!dbConnected) console.log('⚠️  Database not connected.');
   });
 
+  // Start shared live game rounds (color 30s, coinflip 90s, aviator continuous)
+  if (dbConnected) {
+    try {
+      const gameRounds = require('./services/gameRounds');
+      gameRounds.startAll(io);
+    } catch (e) {
+      console.error('Failed to start game rounds', e);
+    }
+  }
+
   // Keep-alive ping: hit our own /ping every 10 min so Render free tier
   // doesn't spin the service down after 15 min of idle.
   const selfUrl = process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL;
