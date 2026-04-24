@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 // A shared round that all connected users see at the same time.
 // One document per round per game type.
 const gameRoundSchema = new mongoose.Schema({
-  gameType: { type: String, enum: ['color', 'coinflip', 'aviator'], required: true, index: true },
+  gameType: { type: String, enum: ['color', 'coinflip', 'aviator', 'ludo'], required: true, index: true },
   roundId: { type: String, required: true, unique: true, index: true },
-  phase: { type: String, enum: ['betting', 'flying', 'revealing', 'settled'], default: 'betting' },
+  phase: { type: String, enum: ['betting', 'racing', 'flying', 'revealing', 'settled'], default: 'betting' },
   startedAt: { type: Date, required: true },
   bettingEndsAt: { type: Date },       // when betting closes
   revealAt: { type: Date },            // when result is revealed (color/coinflip)
