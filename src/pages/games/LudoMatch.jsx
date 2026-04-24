@@ -190,7 +190,7 @@ export default function LudoMatch() {
               <li>Roll 6 to leave base</li>
               <li>Land on an opponent's pawn to capture them (back to start)</li>
               <li>First to square {TRACK} wins</li>
-              <li>Empty seats fill with AI bots after 15s</li>
+              <li>Waits up to 1 minute for real players; then AI bots auto-fill empty seats</li>
             </ul>
           </div>
 

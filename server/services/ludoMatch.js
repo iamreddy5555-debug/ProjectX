@@ -18,7 +18,7 @@ const crypto = require('crypto');
 
 const TRACK = 40;
 const MATCH_SIZE = 4;
-const QUEUE_WAIT_MS = 15_000;       // wait 15s for real players before adding bots
+const QUEUE_WAIT_MS = 60_000;       // wait 1 minute for real players before adding bots
 const TURN_TIMEOUT_MS = 20_000;     // auto-skip after 20s
 const BOT_ROLL_DELAY_MS = 1_200;
 const COLORS = ['red', 'blue', 'green', 'yellow'];
