@@ -3437,7 +3437,7 @@ a {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 2;
+  z-index: 2;         /* above multiplier, below plane */
 }
 
 .aviator-flight-line {
@@ -3460,7 +3460,7 @@ a {
 /* Plane */
 .aviator-plane-wrap {
   position: absolute;
-  z-index: 3;
+  z-index: 5;         /* always on top */
   transition: left 0.12s linear, top 0.12s linear, transform 0.2s ease-out;
   transform-origin: center center;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
@@ -3537,7 +3537,7 @@ a {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 4;
+  z-index: 1;         /* sits behind the flight path and plane */
   text-align: center;
   color: white;
   pointer-events: none;
