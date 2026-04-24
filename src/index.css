@@ -4991,12 +4991,21 @@ a {
   box-shadow: 0 0 6px currentColor;
 }
 
-/* ========== Ludo Match — clean single-column layout ========== */
+/* ========== Ludo Match — one-screen layout, no scroll ========== */
+.ludo-match-page {
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+.ludo-match-page .game-page-header {
+  margin-bottom: 8px;
+}
+
 .ludo-players-strip {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .ludo-strip-card {
@@ -5088,43 +5097,86 @@ a {
   box-shadow: 0 0 6px currentColor;
 }
 
-/* Main board + action area */
+/* Main board + action area — scales to fit viewport without scroll */
 .ludo-main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .ludo-roll-main {
   width: 100%;
-  max-width: 520px;
-  padding: 16px !important;
-  font-size: 1.05rem !important;
+  max-width: var(--ludo-board-size, 560px);
+  padding: 12px 16px !important;
+  font-size: 1rem !important;
   background: linear-gradient(180deg, #fbbf24, #d97706) !important;
   color: #422006 !important;
   box-shadow: 0 6px 18px rgba(251, 191, 36, 0.4) !important;
   animation: pawn-pulse 1.4s ease-in-out infinite;
 }
 
-.ludo-waiting-main {
+.ludo-waiting-main,
+.ludo-action-hint {
   width: 100%;
-  max-width: 520px;
-  padding: 14px;
+  max-width: var(--ludo-board-size, 560px);
+  padding: 10px 14px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   text-align: center;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ludo-action-hint {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 700;
 }
 
 /* ========== Proper Ludo board v3 (4 pawns per player) ========== */
+/* Board size = min(container width, viewport height - page overhead).
+   Overhead reserved: header 64, game header 56, player strip 70,
+   action row 60, margins/padding ~40 ≈ 290px. */
 .ludo-board-v3 {
   position: relative;
   margin: 0 auto;
+  /* CSS var used by the roll button so it can match board width */
+  --ludo-board-size: min(100%, calc(100vh - 290px), 620px);
+  width: var(--ludo-board-size);
+  max-width: var(--ludo-board-size);
+}
+
+.ludo-board-v3 .ludo-grid-v2 {
   width: 100%;
-  max-width: 560px;
+}
+
+.ludo-board-dice-float {
+  position: absolute;
+  top: 6px;
+  right: -56px;
+  z-index: 20;
+}
+
+.ludo-board-dice-float .ludo-dice {
+  width: 48px;
+  height: 48px;
+  padding: 6px;
+}
+
+@media (max-width: 720px) {
+  .ludo-board-dice-float {
+    right: 6px;
+    top: -56px;
+  }
+  .ludo-board-v3 {
+    --ludo-board-size: min(100%, calc(100vh - 340px));
+  }
 }
 
 @media (max-width: 640px) {

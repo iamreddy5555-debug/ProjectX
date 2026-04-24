@@ -323,33 +323,25 @@ export default function LudoMatch() {
             })}
           </div>
 
-          {/* Turn banner — single compact line */}
-          {match.phase === 'playing' && (
-            <div className={`ludo-turnbar-big ${isMyTurn ? 'mine' : ''}`}>
-              {isMyTurn ? (
-                match.awaitingMove
-                  ? <>You rolled <strong>{match.awaitingMove.roll}</strong> — tap a glowing pawn to move</>
-                  : <>Your turn — <strong>Roll the dice</strong> ({turnSecondsLeft}s)</>
-              ) : (
-                <><span className="ludo-turnbar-dot" style={{ background: COLOR_MAP[currentPlayer?.color]?.hex }} />
-                  {currentPlayer?.name}'s turn · {turnSecondsLeft}s</>
-              )}
-            </div>
-          )}
-
-          {/* Board wrapped with side action panels on wide screens */}
+          {/* Board wrapped with compact action under it */}
           <div className="ludo-main">
-            <LudoBoard match={match} me={me} isMyTurn={isMyTurn} onPickPawn={pickPawn} />
+            <LudoBoard match={match} me={me} isMyTurn={isMyTurn} onPickPawn={pickPawn} compact />
 
-            {/* Action / result area right under board */}
+            {/* Action / result area right under board — doubles as turn status */}
             {match.phase === 'playing' && isMyTurn && !match.awaitingMove && (
-              <button className="btn btn-primary btn-lg game-play-btn ludo-roll-main" onClick={roll} disabled={busy}>
-                <Dice5 size={20} /> Roll the Dice
+              <button className="btn btn-primary btn-lg ludo-roll-main" onClick={roll} disabled={busy}>
+                <Dice5 size={20} /> Roll the Dice — your turn ({turnSecondsLeft}s)
               </button>
+            )}
+            {match.phase === 'playing' && isMyTurn && match.awaitingMove && (
+              <div className="ludo-action-hint">
+                You rolled <strong>{match.awaitingMove.roll}</strong> — tap a glowing pawn on the board
+              </div>
             )}
             {match.phase === 'playing' && !isMyTurn && (
               <div className="ludo-waiting-main">
-                Waiting for <strong>{currentPlayer?.name}</strong> to roll...
+                <span className="ludo-turnbar-dot" style={{ background: COLOR_MAP[currentPlayer?.color]?.hex }} />
+                <strong>{currentPlayer?.name}</strong>'s turn — {turnSecondsLeft}s
               </div>
             )}
             {match.phase === 'finished' && (
@@ -362,7 +354,7 @@ export default function LudoMatch() {
                     ? `You won ₹${finishedEvt?.payout || Math.floor(match.pot * 0.875)}! 🎉`
                     : `You lost ₹${me?.stake || stake}`}
                 </div>
-                <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => { setStatus('idle'); setMatch(null); setFinishedEvt(null); refresh(); }}>
+                <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => { setStatus('idle'); setMatch(null); setFinishedEvt(null); refresh(); }}>
                   Play Again
                 </button>
               </div>
@@ -387,7 +379,7 @@ export default function LudoMatch() {
 // with colored home columns, 8 safe stars, center triangle + finish.
 // All pawns (4 per color) positioned via cellFor(color, progress, pawnIdx).
 // -----------------------------------------------------------------------------
-function LudoBoard({ match, me, isMyTurn, onPickPawn }) {
+function LudoBoard({ match, me, isMyTurn, onPickPawn, compact = false }) {
   const movableIds = match.awaitingMove?.options || [];
 
   const renderCell = (col, row, key, style = {}, children = null) => (
@@ -513,8 +505,8 @@ function LudoBoard({ match, me, isMyTurn, onPickPawn }) {
         {pawnEls}
       </div>
 
-      {/* Dice display */}
-      <div className="ludo-board-dice">
+      {/* Last-roll dice floating in a corner (keeps vertical compact) */}
+      <div className="ludo-board-dice-float">
         <div className={`ludo-dice ${match.lastRoll && match.awaitingMove ? 'rolling' : ''}`}>
           {match.lastRoll > 0 ? (
             <div className="dice-face">
@@ -524,7 +516,7 @@ function LudoBoard({ match, me, isMyTurn, onPickPawn }) {
               )))}
             </div>
           ) : (
-            <div className="dice-face idle"><Dice5 size={36} /></div>
+            <div className="dice-face idle"><Dice5 size={24} /></div>
           )}
         </div>
       </div>
