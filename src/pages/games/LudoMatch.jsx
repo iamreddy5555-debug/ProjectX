@@ -106,13 +106,22 @@ export default function LudoMatch() {
   const [status, setStatus] = useState('idle');
   const [queue, setQueue] = useState(null);
   const [match, setMatch] = useState(null);
+  const [displayMatch, setDisplayMatch] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [lastRollEvt, setLastRollEvt] = useState(null);
   const [captureEvt, setCaptureEvt] = useState(null);
   const [finishedEvt, setFinishedEvt] = useState(null);
+  const [diceAnim, setDiceAnim] = useState({ rolling: false, value: 0 });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const tickRef = useRef(null);
+  const prevMatchRef = useRef(null);
+  const animTimersRef = useRef([]);
+  const diceTimerRef = useRef(null);
+
+  const clearAnimTimers = () => {
+    animTimersRef.current.forEach(clearTimeout);
+    animTimersRef.current = [];
+  };
 
   useEffect(() => {
     refresh();
@@ -122,8 +131,20 @@ export default function LudoMatch() {
       if (m.phase === 'finished') setStatus('finished');
     });
     const offRoll = onGameEvent('ludomatch:roll', (r) => {
-      setLastRollEvt({ ...r, ts: Date.now() });
-      setTimeout(() => setLastRollEvt(null), 2000);
+      // Spin the dice while the roll "lands"
+      if (diceTimerRef.current) clearInterval(diceTimerRef.current);
+      let ticks = 0;
+      setDiceAnim({ rolling: true, value: Math.ceil(Math.random() * 6) });
+      diceTimerRef.current = setInterval(() => {
+        ticks++;
+        if (ticks >= 6) {
+          clearInterval(diceTimerRef.current);
+          diceTimerRef.current = null;
+          setDiceAnim({ rolling: false, value: r.roll });
+        } else {
+          setDiceAnim({ rolling: true, value: Math.ceil(Math.random() * 6) });
+        }
+      }, 90);
     });
     const offCapture = onGameEvent('ludomatch:capture', (c) => {
       setCaptureEvt(c);
@@ -133,8 +154,92 @@ export default function LudoMatch() {
       setFinishedEvt(f);
       api.get('/auth/me').then(r => updateBalance(r.data.balance)).catch(() => {});
     });
-    return () => { offState(); offRoll(); offCapture(); offFinished(); };
+    return () => {
+      offState(); offRoll(); offCapture(); offFinished();
+      clearAnimTimers();
+      if (diceTimerRef.current) clearInterval(diceTimerRef.current);
+    };
   }, []);
+
+  // Walk pawn step-by-step when server state shows a forward move.
+  useEffect(() => {
+    if (!match) { setDisplayMatch(null); prevMatchRef.current = null; return; }
+    const prev = prevMatchRef.current;
+    prevMatchRef.current = match;
+
+    if (!prev || prev.matchId !== match.matchId || prev.players.length !== match.players.length) {
+      clearAnimTimers();
+      setDisplayMatch(match);
+      return;
+    }
+
+    // Find a pawn that moved forward (ignore resets to base — those are captures shown on final step)
+    let moving = null;
+    for (let pi = 0; pi < match.players.length && !moving; pi++) {
+      const nextPl = match.players[pi];
+      const prevPl = prev.players[pi];
+      if (!prevPl || prevPl.color !== nextPl.color) continue;
+      for (let pwi = 0; pwi < nextPl.pawns.length; pwi++) {
+        const prevP = prevPl.pawns[pwi];
+        const nextP = nextPl.pawns[pwi];
+        if (!prevP) continue;
+        if (nextP.progress > prevP.progress) {
+          moving = { pi, pwi, from: prevP.progress, to: nextP.progress };
+          break;
+        }
+      }
+    }
+
+    clearAnimTimers();
+
+    if (!moving) {
+      setDisplayMatch(match);
+      return;
+    }
+
+    // Show the "pre-move" state first, then walk one square at a time.
+    const baseState = {
+      ...match,
+      players: match.players.map((pl, i) => ({
+        ...pl,
+        pawns: pl.pawns.map((pn, j) => {
+          // Start intermediate positions from prev progress
+          const prevProg = prev.players[i]?.pawns[j]?.progress;
+          return typeof prevProg === 'number' ? { ...pn, progress: prevProg } : pn;
+        }),
+      })),
+    };
+    setDisplayMatch(baseState);
+
+    const stepMs = 180;
+    const totalSteps = moving.to - moving.from;
+    for (let step = 1; step <= totalSteps; step++) {
+      const t = setTimeout(() => {
+        if (step === totalSteps) {
+          // Final step — switch to server state (captures + rank updates apply now)
+          setDisplayMatch(match);
+        } else {
+          setDisplayMatch(cur => {
+            if (!cur) return cur;
+            const copy = {
+              ...cur,
+              players: cur.players.map((pl, i) => ({
+                ...pl,
+                pawns: pl.pawns.map((pn, j) => {
+                  if (i === moving.pi && j === moving.pwi) {
+                    return { ...pn, progress: moving.from + step };
+                  }
+                  return pn;
+                }),
+              })),
+            };
+            return copy;
+          });
+        }
+      }, step * stepMs);
+      animTimersRef.current.push(t);
+    }
+  }, [match]);
 
   useEffect(() => {
     if (!match?.matchId) return;
@@ -325,7 +430,7 @@ export default function LudoMatch() {
 
           {/* Board wrapped with compact action under it */}
           <div className="ludo-main">
-            <LudoBoard match={match} me={me} isMyTurn={isMyTurn} onPickPawn={pickPawn} compact />
+            <LudoBoard match={displayMatch || match} liveMatch={match} diceAnim={diceAnim} me={me} isMyTurn={isMyTurn} onPickPawn={pickPawn} compact />
 
             {/* Action / result area right under board — doubles as turn status */}
             {match.phase === 'playing' && isMyTurn && !match.awaitingMove && (
@@ -379,8 +484,8 @@ export default function LudoMatch() {
 // with colored home columns, 8 safe stars, center triangle + finish.
 // All pawns (4 per color) positioned via cellFor(color, progress, pawnIdx).
 // -----------------------------------------------------------------------------
-function LudoBoard({ match, me, isMyTurn, onPickPawn, compact = false }) {
-  const movableIds = match.awaitingMove?.options || [];
+function LudoBoard({ match, liveMatch, diceAnim, me, isMyTurn, onPickPawn, compact = false }) {
+  const movableIds = (liveMatch || match).awaitingMove?.options || [];
 
   const renderCell = (col, row, key, style = {}, children = null) => (
     <div key={key} className="ludo-cell" style={{ gridColumn: col, gridRow: row, ...style }}>
@@ -481,7 +586,7 @@ function LudoBoard({ match, me, isMyTurn, onPickPawn, compact = false }) {
       const isFinished = pawn.progress === FINISH;
       pawnEls.push(
         <button
-          key={`${p.color}-${pawn.id}`}
+          key={`${p.color}-${pawn.id}-${pawn.progress}`}
           className={`ludo-pawn-v2 ${canMove ? 'movable' : ''} ${isFinished ? 'finished' : ''}`}
           style={{
             gridColumn: pos.col,
@@ -507,19 +612,30 @@ function LudoBoard({ match, me, isMyTurn, onPickPawn, compact = false }) {
 
       {/* Last-roll dice floating in a corner (keeps vertical compact) */}
       <div className="ludo-board-dice-float">
-        <div className={`ludo-dice ${match.lastRoll && match.awaitingMove ? 'rolling' : ''}`}>
-          {match.lastRoll > 0 ? (
-            <div className="dice-face">
-              {DICE_PIP_LAYOUT[match.lastRoll].map((row, ri) => row.map((on, ci) => (
-                <span key={`${ri}-${ci}`} className={`dice-pip ${on ? 'on' : ''}`}
-                  style={{ background: on ? '#1f2937' : 'transparent' }} />
-              )))}
-            </div>
-          ) : (
-            <div className="dice-face idle"><Dice5 size={24} /></div>
-          )}
-        </div>
+        <LudoDice diceAnim={diceAnim} lastRoll={(liveMatch || match).lastRoll} />
       </div>
+    </div>
+  );
+}
+
+function LudoDice({ diceAnim, lastRoll }) {
+  const rolling = !!diceAnim?.rolling;
+  const shown = rolling ? diceAnim.value : (lastRoll || 0);
+  return (
+    <div className={`ludo-dice ${rolling ? 'rolling' : ''}`}>
+      {shown > 0 ? (
+        <div className="dice-face-combo">
+          <span className="dice-big-num">{shown}</span>
+          <div className="dice-pip-mini">
+            {DICE_PIP_LAYOUT[shown].map((row, ri) => row.map((on, ci) => (
+              <span key={`${ri}-${ci}`} className={`dice-pip ${on ? 'on' : ''}`}
+                style={{ background: on ? '#1f2937' : 'transparent' }} />
+            )))}
+          </div>
+        </div>
+      ) : (
+        <div className="dice-face idle"><Dice5 size={28} /></div>
+      )}
     </div>
   );
 }

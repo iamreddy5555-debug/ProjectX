@@ -5159,24 +5159,65 @@ a {
 .ludo-board-dice-float {
   position: absolute;
   top: 6px;
-  right: -56px;
+  right: -72px;
   z-index: 20;
 }
 
 .ludo-board-dice-float .ludo-dice {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   padding: 6px;
 }
 
 @media (max-width: 720px) {
   .ludo-board-dice-float {
     right: 6px;
-    top: -56px;
+    top: -72px;
   }
   .ludo-board-v3 {
     --ludo-board-size: min(100%, calc(100vh - 340px));
   }
+}
+
+/* Combined dice face — big numeric value with small pip overlay in the corner */
+.dice-face-combo {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dice-big-num {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #1f2937;
+  line-height: 1;
+  text-shadow: 0 1px 0 #fff;
+  letter-spacing: -0.04em;
+}
+
+.ludo-board-dice-float .dice-big-num {
+  font-size: 1.65rem;
+}
+
+.dice-pip-mini {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 40%;
+  height: 40%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1px;
+  opacity: 0.55;
+}
+
+.dice-pip-mini .dice-pip {
+  max-width: 4px;
+  max-height: 4px;
 }
 
 @media (max-width: 640px) {
@@ -5261,6 +5302,13 @@ a {
   align-items: center;
   justify-content: center;
   transition: transform 0.25s, box-shadow 0.25s;
+  animation: pawn-hop 0.18s ease-out;
+}
+
+@keyframes pawn-hop {
+  0%   { transform: translateY(-28%) scale(0.9); }
+  60%  { transform: translateY(0)    scale(1.05); }
+  100% { transform: translateY(0)    scale(1); }
 }
 
 .ludo-pawn-v2.movable {
