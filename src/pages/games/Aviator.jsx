@@ -5,7 +5,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, Wallet, Plane } from 'lucide-react';
 import api from '../../utils/api';
 
-const STAKES = [49, 99, 299, 599, 999];
+const STAKES = [10, 20, 50, 100, 500, 1000, 2000];
 
 // Local multiplier from elapsed time — MUST match the server formula
 // Server: multiplier = 1.06^tSec
@@ -18,7 +18,7 @@ export default function Aviator() {
   const { user, updateBalance } = useAuth();
   const navigate = useNavigate();
 
-  const [stake, setStake] = useState(49);
+  const [stake, setStake] = useState(10);
   const [phase, setPhase] = useState('idle'); // 'idle' | 'flying' | 'result'
   const [betId, setBetId] = useState(null);
   const [startedAt, setStartedAt] = useState(null);

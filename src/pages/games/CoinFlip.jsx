@@ -5,13 +5,13 @@ import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, Wallet } from 'lucide-react';
 import api from '../../utils/api';
 
-const STAKES = [49, 99, 299, 599, 999];
+const STAKES = [20, 100, 300, 1000, 3000];
 
 export default function CoinFlip() {
   const { user, updateBalance } = useAuth();
   const navigate = useNavigate();
   const [selection, setSelection] = useState(null);
-  const [stake, setStake] = useState(49);
+  const [stake, setStake] = useState(20);
   const [flipping, setFlipping] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');

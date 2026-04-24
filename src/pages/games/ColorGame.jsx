@@ -5,7 +5,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { ArrowLeft, Wallet } from 'lucide-react';
 import api from '../../utils/api';
 
-const STAKES = [49, 99, 299, 599, 999];
+const STAKES = [10, 50, 100, 500, 1000, 2000];
 const NUMBERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 const colorFor = (n) => {
@@ -18,7 +18,7 @@ export default function ColorGame() {
   const { user, updateBalance } = useAuth();
   const navigate = useNavigate();
   const [selection, setSelection] = useState(null);
-  const [stake, setStake] = useState(49);
+  const [stake, setStake] = useState(10);
   const [playing, setPlaying] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');

@@ -4,11 +4,19 @@ const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 const router = express.Router();
 
-const ALLOWED_STAKES = [49, 99, 299, 599, 999];
+// Each game has its own stake tiers (keeps games differentiated from cricket bets)
+const STAKE_TIERS = {
+  color:    [10, 50, 100, 500, 1000, 2000],
+  coinflip: [20, 100, 300, 1000, 3000],
+  aviator:  [10, 20, 50, 100, 500, 1000, 2000],
+};
 
 // ===== Helpers =====
-const getUserChecked = async (userId, stake) => {
-  if (!ALLOWED_STAKES.includes(stake)) throw { code: 400, message: 'Invalid stake amount' };
+const getUserChecked = async (userId, stake, gameType) => {
+  const allowed = STAKE_TIERS[gameType];
+  if (!allowed || !allowed.includes(stake)) {
+    throw { code: 400, message: `Invalid stake. Allowed: ${(allowed || []).join(', ')}` };
+  }
   const user = await User.findById(userId);
   if (!user) throw { code: 404, message: 'User not found' };
   if (user.banned) throw { code: 403, message: 'Account suspended' };
@@ -36,7 +44,7 @@ router.post('/color', auth, async (req, res) => {
   try {
     const { selection, stake } = req.body;
     if (!selection) return res.status(400).json({ message: 'Selection required' });
-    const user = await getUserChecked(req.user.id, stake);
+    const user = await getUserChecked(req.user.id, stake, 'color');
 
     // Deduct stake
     user.balance -= stake;
@@ -94,7 +102,7 @@ router.post('/coinflip', auth, async (req, res) => {
     if (!['heads', 'tails'].includes(selection)) {
       return res.status(400).json({ message: 'Selection must be heads or tails' });
     }
-    const user = await getUserChecked(req.user.id, stake);
+    const user = await getUserChecked(req.user.id, stake, 'coinflip');
 
     user.balance -= stake;
     await user.save();
@@ -146,7 +154,7 @@ const generateCrashPoint = () => {
 router.post('/aviator/start', auth, async (req, res) => {
   try {
     const { stake } = req.body;
-    const user = await getUserChecked(req.user.id, stake);
+    const user = await getUserChecked(req.user.id, stake, 'aviator');
 
     user.balance -= stake;
     await user.save();
