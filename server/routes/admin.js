@@ -7,6 +7,8 @@ const Contest = require('../models/Contest');
 const FantasyTeam = require('../models/FantasyTeam');
 const Payment = require('../models/Payment');
 const Bet = require('../models/Bet');
+const GameBet = require('../models/GameBet');
+const AdminControl = require('../models/AdminControl');
 const QRCode = require('../models/QRCode');
 const ChatMessage = require('../models/ChatMessage');
 const { adminAuth } = require('../middleware/auth');
@@ -368,6 +370,135 @@ router.post('/chats/:userId', adminAuth, async (req, res) => {
     await msg.save();
     res.status(201).json(msg);
   } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ===== GAMES: STATS + CONTROL =====
+
+// Per-game aggregate stats + top users by stake
+router.get('/games/stats', adminAuth, async (req, res) => {
+  try {
+    const byGame = await GameBet.aggregate([
+      { $match: { status: 'settled' } },
+      { $group: {
+          _id: '$gameType',
+          bets: { $sum: 1 },
+          totalStake: { $sum: '$stake' },
+          totalPayout: { $sum: '$payout' },
+          wins: { $sum: { $cond: ['$won', 1, 0] } },
+      } },
+    ]);
+
+    // House P/L = totalStake - totalPayout
+    const summary = {};
+    for (const row of byGame) {
+      summary[row._id] = {
+        bets: row.bets,
+        totalStake: row.totalStake,
+        totalPayout: row.totalPayout,
+        housePL: row.totalStake - row.totalPayout,
+        wins: row.wins,
+        winRate: row.bets > 0 ? +(row.wins / row.bets * 100).toFixed(2) : 0,
+      };
+    }
+
+    // Top 10 users by stake volume per game
+    const perGameUsers = {};
+    for (const gt of ['color', 'coinflip', 'aviator']) {
+      const top = await GameBet.aggregate([
+        { $match: { gameType: gt, status: 'settled' } },
+        { $group: {
+            _id: '$userId',
+            bets: { $sum: 1 },
+            totalStake: { $sum: '$stake' },
+            totalPayout: { $sum: '$payout' },
+        } },
+        { $sort: { totalStake: -1 } },
+        { $limit: 10 },
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+        { $unwind: '$user' },
+        { $project: {
+            _id: 0,
+            userId: '$_id',
+            name: '$user.name',
+            email: '$user.email',
+            phone: '$user.phone',
+            bets: 1,
+            totalStake: 1,
+            totalPayout: 1,
+            housePL: { $subtract: ['$totalStake', '$totalPayout'] },
+        } },
+      ]);
+      perGameUsers[gt] = top;
+    }
+
+    res.json({ summary, topUsers: perGameUsers });
+  } catch (err) {
+    console.error('games/stats', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Paginated bet list per game
+router.get('/games/bets', adminAuth, async (req, res) => {
+  try {
+    const { game, limit = 50 } = req.query;
+    const filter = game ? { gameType: game } : {};
+    const bets = await GameBet.find(filter)
+      .populate('userId', 'name email phone')
+      .sort({ createdAt: -1 })
+      .limit(Math.min(parseInt(limit, 10) || 50, 200));
+    res.json(bets);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get current control overrides
+router.get('/control', adminAuth, async (req, res) => {
+  try {
+    const ctl = await AdminControl.getSingleton();
+    res.json(ctl);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update control overrides
+router.patch('/control', adminAuth, async (req, res) => {
+  try {
+    const { nextColorRoll, nextColorMode, nextAviatorCrash, nextAviatorMode } = req.body;
+    const ctl = await AdminControl.getSingleton();
+
+    if (nextColorRoll === 'clear' || nextColorRoll === null) {
+      ctl.nextColorRoll = null;
+    } else if (typeof nextColorRoll === 'number' && nextColorRoll >= 0 && nextColorRoll <= 9) {
+      ctl.nextColorRoll = Math.floor(nextColorRoll);
+      ctl.nextColorSetBy = req.user.id;
+      ctl.nextColorSetAt = new Date();
+    }
+
+    if (nextColorMode && ['oneshot', 'persistent'].includes(nextColorMode)) {
+      ctl.nextColorMode = nextColorMode;
+    }
+
+    if (nextAviatorCrash === 'clear' || nextAviatorCrash === null) {
+      ctl.nextAviatorCrash = null;
+    } else if (typeof nextAviatorCrash === 'number' && nextAviatorCrash >= 1 && nextAviatorCrash <= 100) {
+      ctl.nextAviatorCrash = Math.round(nextAviatorCrash * 100) / 100;
+      ctl.nextAviatorSetBy = req.user.id;
+      ctl.nextAviatorSetAt = new Date();
+    }
+
+    if (nextAviatorMode && ['oneshot', 'persistent'].includes(nextAviatorMode)) {
+      ctl.nextAviatorMode = nextAviatorMode;
+    }
+
+    await ctl.save();
+    res.json(ctl);
+  } catch (err) {
+    console.error('control patch', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

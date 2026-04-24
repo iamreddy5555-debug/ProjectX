@@ -1,6 +1,7 @@
 const express = require('express');
 const GameBet = require('../models/GameBet');
 const User = require('../models/User');
+const AdminControl = require('../models/AdminControl');
 const { auth } = require('../middleware/auth');
 const router = express.Router();
 
@@ -71,7 +72,18 @@ router.post('/color', auth, async (req, res) => {
     user.balance -= stake;
     await user.save();
 
-    const roll = Math.floor(Math.random() * 10);
+    // Check admin override for next roll
+    const control = await AdminControl.getSingleton();
+    let roll;
+    if (control.nextColorRoll !== null && control.nextColorRoll !== undefined) {
+      roll = control.nextColorRoll;
+      if (control.nextColorMode === 'oneshot') {
+        control.nextColorRoll = null;
+        await control.save();
+      }
+    } else {
+      roll = Math.floor(Math.random() * 10);
+    }
     const colors = colorsOfNumber(roll);
 
     // Determine win
@@ -209,7 +221,19 @@ router.post('/aviator/start', auth, async (req, res) => {
     user.balance -= stake;
     await user.save();
 
-    const crashPoint = generateCrashPoint();
+    // Check admin override for crash point
+    const control = await AdminControl.getSingleton();
+    let crashPoint;
+    if (control.nextAviatorCrash !== null && control.nextAviatorCrash !== undefined) {
+      crashPoint = control.nextAviatorCrash;
+      if (control.nextAviatorMode === 'oneshot') {
+        control.nextAviatorCrash = null;
+        await control.save();
+      }
+    } else {
+      crashPoint = generateCrashPoint();
+    }
+
     const bet = await GameBet.create({
       userId: user._id,
       gameType: 'aviator',

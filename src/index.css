@@ -4747,6 +4747,204 @@ a {
   color: white;
 }
 
+/* ========== ADMIN GAMES PAGE ========== */
+.games-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.game-summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-card);
+}
+
+.game-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.game-summary-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-summary-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.game-summary-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gss-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.gss-row span { color: var(--text-secondary); }
+.gss-row strong { font-weight: 700; color: var(--text-primary); }
+
+.gss-row.highlight {
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+}
+
+.gss-row .positive { color: var(--accent-success); display: inline-flex; align-items: center; gap: 4px; }
+.gss-row .negative { color: var(--accent-danger); display: inline-flex; align-items: center; gap: 4px; }
+
+/* Control cards */
+.control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.control-card {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.05), rgba(239, 68, 68, 0.05));
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.control-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.control-head h3 { font-size: 1rem; font-weight: 800; margin: 0; }
+
+.control-desc {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin: 0 0 12px;
+}
+
+.control-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.control-pill {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.control-pill.active {
+  background: var(--accent-warning-light);
+  color: var(--accent-warning);
+  border: 1px solid var(--accent-warning);
+}
+
+.control-pill.none {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+.control-numbers,
+.control-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.control-num {
+  padding: 10px;
+  background: var(--bg-tertiary);
+  border: 1.5px solid var(--border-light);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.control-num:hover { border-color: var(--accent-primary); }
+
+.control-num.selected {
+  background: var(--accent-warning-light);
+  border-color: var(--accent-warning);
+  color: var(--accent-warning);
+}
+
+.control-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.control-row input {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.control-clear {
+  width: 100%;
+  justify-content: center;
+}
+
+.top-users-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.top-tab {
+  padding: 8px 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.top-tab.active {
+  background: var(--gradient-gold);
+  color: var(--text-inverse);
+  border-color: transparent;
+}
+
 /* ========== BOTTOM NAV (mobile) ========== */
 .bottom-nav {
   display: none;

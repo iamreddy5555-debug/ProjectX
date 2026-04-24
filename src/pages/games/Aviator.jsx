@@ -124,9 +124,6 @@ export default function Aviator() {
         </button>
         <div className="aviator-logo">
           <span className="aviator-logo-text">Aviator</span>
-          <span className="wingo-open-badge" style={{ marginLeft: 10 }}>
-            <span className="wingo-open-dot" /> 24/7
-          </span>
         </div>
         <div className="game-wallet">
           <Wallet size={14} /> {formatCurrency(user?.balance || 0)}

@@ -12,6 +12,7 @@ import AdminQRCodes from './AdminQRCodes';
 import AdminMatches from './AdminMatches';
 import AdminContests from './AdminContests';
 import AdminBets from './AdminBets';
+import AdminGames from './AdminGames';
 import AdminChat from './AdminChat';
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
   { id: 'matches', label: 'Matches', icon: Trophy },
   { id: 'contests', label: 'Contests', icon: Gamepad2 },
   { id: 'bets', label: 'Bets', icon: Target },
+  { id: 'games', label: 'Games', icon: Gamepad2 },
   { id: 'payments', label: 'Payments', icon: CreditCard, badge: true },
   { id: 'qrcodes', label: 'QR Codes', icon: QrCode },
   { id: 'chat', label: 'Chat', icon: MessageCircle, badge: true },
@@ -46,6 +48,7 @@ export default function AdminLayout() {
       case 'matches': return <AdminMatches />;
       case 'contests': return <AdminContests />;
       case 'bets': return <AdminBets />;
+      case 'games': return <AdminGames />;
       case 'chat': return <AdminChat onUnreadCount={setUnreadChats} />;
       default: return <AdminDashboard onNavigate={setActivePage} />;
     }
