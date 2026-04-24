@@ -276,6 +276,19 @@ router.get('/aviator/pending', auth, async (req, res) => {
 });
 
 // ===== HISTORY =====
+// Last 20 settled aviator crash points across all users (public stats, no PII)
+router.get('/aviator/crashes', async (req, res) => {
+  try {
+    const bets = await GameBet.find({ gameType: 'aviator', status: 'settled' })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('crashPoint createdAt');
+    res.json(bets.map(b => ({ crashPoint: b.crashPoint, at: b.createdAt })));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.get('/history', auth, async (req, res) => {
   try {
     const bets = await GameBet.find({ userId: req.user.id, status: 'settled' })
