@@ -7,16 +7,8 @@ const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 const router = express.Router();
 
-// Multer config for screenshot uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../uploads/screenshots'));
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+// Screenshot upload — store in memory, save as base64 in DB (survives Render redeploys)
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Get a random active QR code for deposit
 router.get('/qr', auth, async (req, res) => {
@@ -39,12 +31,17 @@ router.post('/deposit', auth, upload.single('screenshot'), async (req, res) => {
     if (!amount || !req.file) {
       return res.status(400).json({ message: 'Amount and screenshot are required' });
     }
+    // Store screenshot as base64 data URL in DB — survives Render redeploys
+    const mimeType = req.file.mimetype || 'image/png';
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
     const payment = new Payment({
       userId: req.user.id,
       type: 'deposit',
       amount: parseFloat(amount),
       qrCodeId: qrCodeId || undefined,
-      screenshotUrl: `/uploads/screenshots/${req.file.filename}`,
+      screenshotUrl: dataUrl,
       utrNumber: utrNumber || '',
       status: 'pending',
     });

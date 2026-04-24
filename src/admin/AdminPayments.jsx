@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 import { Check, X, Eye, Download, Filter } from 'lucide-react';
-import api, { SERVER_URL } from '../utils/api';
+import api, { resolveImageUrl } from '../utils/api';
 
 export default function AdminPayments({ onPendingCount }) {
   const [payments, setPayments] = useState([]);
@@ -128,7 +128,7 @@ export default function AdminPayments({ onPendingCount }) {
                     <span className="payment-detail-label">Screenshot</span>
                     <button
                       className="btn btn-outline btn-sm"
-                      onClick={() => setViewImage(`${SERVER_URL}${p.screenshotUrl}`)}
+                      onClick={() => setViewImage(resolveImageUrl(p.screenshotUrl))}
                     >
                       <Eye size={14} /> View
                     </button>

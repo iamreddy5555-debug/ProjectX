@@ -12,12 +12,8 @@ const ChatMessage = require('../models/ChatMessage');
 const { adminAuth } = require('../middleware/auth');
 const router = express.Router();
 
-// QR upload config
-const qrStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads/qrcodes')),
-  filename: (req, file, cb) => cb(null, `qr-${Date.now()}${path.extname(file.originalname)}`)
-});
-const qrUpload = multer({ storage: qrStorage, limits: { fileSize: 5 * 1024 * 1024 } });
+// QR upload — store in memory, save as base64 data URL in DB (survives Render redeploys)
+const qrUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // ===== RESEED PLAYERS =====
 router.post('/reseed', adminAuth, async (req, res) => {
@@ -207,15 +203,21 @@ router.post('/qrcodes', adminAuth, qrUpload.single('qrImage'), async (req, res) 
     if (!upiId || !req.file) {
       return res.status(400).json({ message: 'UPI ID and QR image are required' });
     }
+    // Store image as base64 data URL in DB — survives Render redeploys
+    const mimeType = req.file.mimetype || 'image/png';
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
     const qrCode = new QRCode({
-      imageUrl: `/uploads/qrcodes/${req.file.filename}`,
+      imageUrl: dataUrl,
       upiId,
       label: label || 'Payment QR',
     });
     await qrCode.save();
     res.status(201).json(qrCode);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('QR upload error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

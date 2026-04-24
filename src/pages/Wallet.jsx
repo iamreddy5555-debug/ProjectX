@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 import { Wallet as WalletIcon, ArrowDownCircle, ArrowUpCircle, Upload, X } from 'lucide-react';
-import api, { SERVER_URL } from '../utils/api';
+import api, { resolveImageUrl } from '../utils/api';
 
 export default function Wallet() {
   const { user, updateBalance } = useAuth();
@@ -173,7 +173,7 @@ export default function Wallet() {
                 <div className="qr-display">
                   <div className="qr-image" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {qrCode.imageUrl ? (
-                      <img src={`${SERVER_URL}${qrCode.imageUrl}`} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 10 }} />
+                      <img src={resolveImageUrl(qrCode.imageUrl)} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 10 }} />
                     ) : (
                       <span>QR Code</span>
                     )}
