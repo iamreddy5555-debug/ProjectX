@@ -131,20 +131,20 @@ export default function LudoMatch() {
       if (m.phase === 'finished') setStatus('finished');
     });
     const offRoll = onGameEvent('ludomatch:roll', (r) => {
-      // Spin the dice while the roll "lands"
+      // Spin the dice while the roll "lands" (~1.3s feels natural)
       if (diceTimerRef.current) clearInterval(diceTimerRef.current);
       let ticks = 0;
       setDiceAnim({ rolling: true, value: Math.ceil(Math.random() * 6) });
       diceTimerRef.current = setInterval(() => {
         ticks++;
-        if (ticks >= 6) {
+        if (ticks >= 9) {
           clearInterval(diceTimerRef.current);
           diceTimerRef.current = null;
           setDiceAnim({ rolling: false, value: r.roll });
         } else {
           setDiceAnim({ rolling: true, value: Math.ceil(Math.random() * 6) });
         }
-      }, 90);
+      }, 150);
     });
     const offCapture = onGameEvent('ludomatch:capture', (c) => {
       setCaptureEvt(c);

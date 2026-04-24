@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const MATCH_SIZE = 4;
 const QUEUE_WAIT_MS = 60_000;
 const TURN_TIMEOUT_MS = 25_000;
-const BOT_THINK_MS = 1_200;
+const BOT_THINK_MS = 2_500;
 const COLORS = ['red', 'blue', 'green', 'yellow'];
 const HOUSE_CUT = 0.125;
 
@@ -350,8 +350,12 @@ const doRoll = async (matchId, userId, fromBot = false) => {
   }
 
   if (options.length === 1) {
-    // Auto-move
-    await applyMove(matchId, options[0], roll);
+    if (current.isBot) {
+      // Give the dice time to visually settle before the bot moves.
+      setTimeout(() => applyMove(matchId, options[0], roll), BOT_THINK_MS);
+    } else {
+      await applyMove(matchId, options[0], roll);
+    }
   } else {
     // Waiting for pawn pick
     room.awaitingMove = { roll, options };
