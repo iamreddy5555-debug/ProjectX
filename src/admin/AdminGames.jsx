@@ -46,6 +46,26 @@ export default function AdminGames() {
     } catch (err) { showToast('Failed'); }
   };
 
+  // Force a color by picking a random number of that color
+  const forceColor = (color, mode = 'oneshot') => {
+    const pools = {
+      red:    [2, 4, 6, 8],       // pure red
+      green:  [1, 3, 7, 9],       // pure green
+      violet: [0, 5],             // violet (also counts as red/green partially)
+    };
+    const pool = pools[color];
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    setNextColorRoll(pick, mode);
+  };
+
+  // Helper to describe what color a number represents
+  const numberColorLabel = (n) => {
+    if (n === 0) return 'Red + Violet';
+    if (n === 5) return 'Green + Violet';
+    if ([2,4,6,8].includes(n)) return 'Red';
+    return 'Green';
+  };
+
   const setNextAviatorCrash = async (mult, mode = 'oneshot') => {
     try {
       const res = await api.patch('/admin/control', { nextAviatorCrash: mult, nextAviatorMode: mode });
@@ -139,25 +159,54 @@ export default function AdminGames() {
               <Palette size={18} style={{ color: '#a855f7' }} />
               <h3>Color & Number</h3>
             </div>
-            <p className="control-desc">Force the next roll to a specific number (0-9).</p>
+            <p className="control-desc">
+              Force the next result. Pick a color (random matching number), a specific number, or both.
+            </p>
 
             <div className="control-current">
               Current override:
               {control?.nextColorRoll !== null && control?.nextColorRoll !== undefined ? (
                 <span className="control-pill active">
-                  {control.nextColorRoll} ({control.nextColorMode})
+                  #{control.nextColorRoll} → {numberColorLabel(control.nextColorRoll)} ({control.nextColorMode})
                 </span>
               ) : (
                 <span className="control-pill none">None (random)</span>
               )}
             </div>
 
+            <div className="control-subhead">Force Color</div>
+            <div className="control-color-picker">
+              <button
+                className="control-color-btn green"
+                onClick={() => forceColor('green')}
+                title="Random number from {1, 3, 7, 9}"
+              >
+                Green<span className="ccb-hint">1·3·7·9</span>
+              </button>
+              <button
+                className="control-color-btn violet"
+                onClick={() => forceColor('violet')}
+                title="Random number from {0, 5}"
+              >
+                Violet<span className="ccb-hint">0·5 · 4.5×</span>
+              </button>
+              <button
+                className="control-color-btn red"
+                onClick={() => forceColor('red')}
+                title="Random number from {2, 4, 6, 8}"
+              >
+                Red<span className="ccb-hint">2·4·6·8</span>
+              </button>
+            </div>
+
+            <div className="control-subhead">Force Number (exact)</div>
             <div className="control-numbers">
               {[0,1,2,3,4,5,6,7,8,9].map(n => (
                 <button
                   key={n}
-                  className={`control-num ${control?.nextColorRoll === n ? 'selected' : ''}`}
+                  className={`control-num color-num-${numberColorLabel(n).toLowerCase().split(' ')[0]} ${control?.nextColorRoll === n ? 'selected' : ''}`}
                   onClick={() => setNextColorRoll(n)}
+                  title={numberColorLabel(n)}
                 >
                   {n}
                 </button>
