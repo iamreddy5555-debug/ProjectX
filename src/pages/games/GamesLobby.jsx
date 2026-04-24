@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
-import { Wallet, Palette, Coins, Plane, Flame, Sparkles, Dice5 } from 'lucide-react';
+import { Wallet, Palette, Coins, Plane, Flame, Sparkles, Dice5, Users } from 'lucide-react';
 
 const GAMES = [
   {
@@ -32,6 +32,16 @@ const GAMES = [
     icon: Dice5,
     gradient: 'linear-gradient(135deg, #ef4444 0%, #fbbf24 33%, #22c55e 66%, #3b82f6 100%)',
     maxPayout: '3.6×',
+    hot: true,
+  },
+  {
+    id: 'ludo-match',
+    path: '/games/ludo-match',
+    name: 'Ludo Match',
+    tagline: '4-player live tables',
+    icon: Users,
+    gradient: 'linear-gradient(135deg, #22c55e 0%, #3b82f6 50%, #ef4444 100%)',
+    maxPayout: '3.5×',
     hot: true,
   },
   {

@@ -34,6 +34,11 @@ const adminControlSchema = new mongoose.Schema({
     green:  { type: Number, min: 1, max: 6, default: null },
     yellow: { type: Number, min: 1, max: 6, default: null },
   },
+
+  // Ludo Match (4-player rooms): force the next dice roll for any player
+  // whose turn comes up. null = random.
+  nextLudoMatchDice: { type: Number, min: 1, max: 6, default: null },
+  nextLudoMatchMode: { type: String, enum: ['oneshot', 'persistent'], default: 'oneshot' },
 }, { timestamps: true, _id: false });
 
 adminControlSchema.statics.getSingleton = async function () {

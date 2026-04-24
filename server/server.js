@@ -122,6 +122,8 @@ const startServer = async () => {
     try {
       const gameRounds = require('./services/gameRounds');
       gameRounds.startAll(io);
+      const ludoMatch = require('./services/ludoMatch');
+      ludoMatch.init(io);
     } catch (e) {
       console.error('Failed to start game rounds', e);
     }

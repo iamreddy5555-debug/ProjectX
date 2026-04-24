@@ -6,10 +6,11 @@ import api from '../utils/api';
 const POLL_INTERVAL = 4000; // 4 seconds
 
 const GAME_LABELS = {
-  color:    { name: 'Color / Number', icon: Palette, color: '#a855f7' },
-  coinflip: { name: 'Coin Flip',      icon: Coins,   color: '#fbbf24' },
-  aviator:  { name: 'Aviator',        icon: Plane,   color: '#ef4444' },
-  ludo:     { name: 'Ludo Race',      icon: Dice5,   color: '#22c55e' },
+  color:         { name: 'Color / Number', icon: Palette, color: '#a855f7' },
+  coinflip:      { name: 'Coin Flip',      icon: Coins,   color: '#fbbf24' },
+  aviator:       { name: 'Aviator',        icon: Plane,   color: '#ef4444' },
+  ludo:          { name: 'Ludo Race',      icon: Dice5,   color: '#22c55e' },
+  'ludo-match':  { name: 'Ludo Match',     icon: Dice5,   color: '#3b82f6' },
 };
 
 const LUDO_COLORS = [
@@ -22,7 +23,7 @@ const LUDO_COLORS = [
 export default function AdminGames() {
   const [stats, setStats] = useState(null);
   const [control, setControl] = useState(null);
-  const [bets, setBets] = useState({ color: [], coinflip: [], aviator: [], ludo: [] });
+  const [bets, setBets] = useState({ color: [], coinflip: [], aviator: [], ludo: [], 'ludo-match': [] });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [activeGame, setActiveGame] = useState('color');
@@ -64,17 +65,21 @@ export default function AdminGames() {
   const loadAll = async (initial = false) => {
     if (initial) setLoading(true);
     try {
-      const [s, c, bColor, bCoin, bAviator, bLudo] = await Promise.all([
+      const [s, c, bColor, bCoin, bAviator, bLudo, bLudoMatch] = await Promise.all([
         api.get('/admin/games/stats'),
         api.get('/admin/control'),
         api.get('/admin/games/bets?game=color&limit=25'),
         api.get('/admin/games/bets?game=coinflip&limit=25'),
         api.get('/admin/games/bets?game=aviator&limit=25'),
         api.get('/admin/games/bets?game=ludo&limit=25'),
+        api.get('/admin/games/bets?game=ludo-match&limit=25'),
       ]);
       setStats(s.data);
       setControl(c.data);
-      setBets({ color: bColor.data, coinflip: bCoin.data, aviator: bAviator.data, ludo: bLudo.data });
+      setBets({
+        color: bColor.data, coinflip: bCoin.data, aviator: bAviator.data,
+        ludo: bLudo.data, 'ludo-match': bLudoMatch.data,
+      });
       setLastUpdate(new Date());
       if (!initial) {
         setPulse(true);
@@ -153,6 +158,14 @@ export default function AdminGames() {
       } else {
         showToast(`${color} dice forced to ${value}`);
       }
+    } catch (err) { showToast('Failed'); }
+  };
+
+  const setLudoMatchDice = async (value, mode = 'oneshot') => {
+    try {
+      const res = await api.patch('/admin/control', { nextLudoMatchDice: value, nextLudoMatchMode: mode });
+      setControl(res.data);
+      showToast(value === 'clear' ? 'Ludo Match dice cleared' : `Next dice: ${value} (${mode})`);
     } catch (err) { showToast('Failed'); }
   };
 
@@ -558,6 +571,61 @@ export default function AdminGames() {
                 Clear all dice overrides
               </button>
             </div>
+          </div>
+          )}
+
+          {/* Ludo Match control */}
+          {(section === 'overview' || section === 'ludo-match') && (
+          <div className="control-card">
+            <div className="control-head">
+              <Dice5 size={18} style={{ color: '#3b82f6' }} />
+              <h3>Ludo Match (4-player)</h3>
+            </div>
+            <p className="control-desc">
+              Force the next dice roll for any active match. Applies to whichever
+              player's turn comes up next in any ongoing 4-player Ludo room.
+            </p>
+
+            <div className="control-current">
+              Current override:
+              {typeof control?.nextLudoMatchDice === 'number' ? (
+                <span className="control-pill active">
+                  {control.nextLudoMatchDice} ({control.nextLudoMatchMode})
+                </span>
+              ) : (
+                <span className="control-pill none">None (random)</span>
+              )}
+            </div>
+
+            <div className="control-subhead">Force Next Dice</div>
+            <div className="control-numbers">
+              {[1,2,3,4,5,6].map(v => (
+                <button
+                  key={v}
+                  className={`control-num ${control?.nextLudoMatchDice === v ? 'selected' : ''}`}
+                  onClick={() => setLudoMatchDice(v)}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+
+            <div className="control-row">
+              {[1,2,3,4,5,6].map(v => (
+                <button
+                  key={v}
+                  className="btn btn-outline btn-sm"
+                  style={{ flex: 1, minWidth: 0 }}
+                  onClick={() => setLudoMatchDice(v, 'persistent')}
+                >
+                  {v} persistent
+                </button>
+              ))}
+            </div>
+
+            <button className="btn btn-danger btn-sm control-clear" onClick={() => setLudoMatchDice('clear')}>
+              Clear override
+            </button>
           </div>
           )}
         </div>

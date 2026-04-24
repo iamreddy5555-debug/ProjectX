@@ -4834,6 +4834,293 @@ a {
   color: white;
 }
 
+/* ========== LUDO MATCH (4-player rooms) ========== */
+.ludo-match-hero {
+  padding: 20px;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(34, 197, 94, 0.15));
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-lg);
+}
+
+.ludo-match-hero h2 { margin: 0 0 8px; font-size: 1.3rem; }
+.ludo-match-hero p { margin: 0 0 12px; color: var(--text-secondary); }
+.ludo-match-hero ul { margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--text-secondary); }
+.ludo-match-hero li { margin-bottom: 4px; }
+
+.ludo-match-queue {
+  padding: 32px;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  margin-bottom: 20px;
+}
+
+.ludo-match-queue-icon {
+  width: 64px; height: 64px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
+  display: flex; align-items: center; justify-content: center;
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+.ludo-match-queue h3 { margin: 0 0 8px; font-size: 1.2rem; }
+.ludo-match-queue-stake { font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 6px; }
+.ludo-match-queue-count { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+
+.ludo-match-queue-bar {
+  height: 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin: 0 auto 12px;
+  max-width: 320px;
+}
+
+.ludo-match-queue-fill {
+  height: 100%;
+  background: var(--gradient-gold);
+  transition: width 0.4s;
+}
+
+.ludo-match-queue-timer { font-size: 0.85rem; color: var(--text-tertiary); }
+.ludo-match-queue-timer strong { color: var(--accent-primary); }
+
+/* Players panel */
+.ludo-match-players {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ludo-match-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
+}
+
+.ludo-match-player.turn {
+  border-color: var(--c);
+  background: var(--soft);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05), 0 0 16px var(--c);
+  transform: translateY(-2px);
+}
+
+.ludo-match-player.winner {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.ludo-match-player-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 8px var(--c);
+  flex-shrink: 0;
+}
+
+.ludo-match-player-info { flex: 1; min-width: 0; }
+
+.ludo-match-player-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ludo-match-player-pos { font-size: 0.7rem; color: var(--text-tertiary); }
+
+.ludo-match-win-badge {
+  padding: 2px 8px;
+  background: #22c55e;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  border-radius: var(--radius-full);
+}
+
+/* Turn bar */
+.ludo-match-turnbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.ludo-match-turnbar.mine {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+.ludo-match-turnbar span { font-weight: 600; opacity: 0.8; }
+
+.ludo-match-turn-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* Board */
+.ludo-match-board {
+  position: relative;
+  background: #f8fafc;
+  border: 3px solid #1f2937;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  min-height: 300px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* 4 colored corner bases */
+.ludo-match-base {
+  position: absolute;
+  width: 70px;
+  height: 70px;
+  background: var(--soft);
+  border: 3px solid var(--c);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.6rem;
+  color: var(--c);
+}
+
+.ludo-match-base.tl { top: 14px; left: 14px; }
+.ludo-match-base.tr { top: 14px; right: 14px; }
+.ludo-match-base.br { bottom: 14px; right: 14px; }
+.ludo-match-base.bl { bottom: 14px; left: 14px; }
+
+.ludo-match-base-label { margin-bottom: 6px; }
+
+.ludo-match-base-pawn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #1f2937;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Linear track grid (simplified — 40 cells in a wrapping row) */
+.ludo-match-track {
+  margin: 80px 90px 80px 90px;
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  min-height: 160px;
+}
+
+.ludo-match-cell {
+  position: relative;
+  aspect-ratio: 1;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ludo-match-cell-num {
+  font-size: 0.55rem;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.ludo-match-pawn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #1f2937;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+  transition: left 0.3s;
+}
+
+/* Center dice area */
+.ludo-match-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 3;
+}
+
+.ludo-match-roll-flash {
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-transform: capitalize;
+  text-shadow: 0 1px 0 white;
+  animation: roll-flash-pop 0.4s ease;
+}
+
+@keyframes roll-flash-pop {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.ludo-match-capture-banner {
+  padding: 10px 14px;
+  margin-top: 14px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: var(--radius-md);
+  color: #ef4444;
+  font-weight: 800;
+  text-align: center;
+  text-transform: capitalize;
+  animation: roll-flash-pop 0.3s ease;
+}
+
+.ludo-match-capture-banner span { font-weight: 900; }
+
+@media (max-width: 640px) {
+  .ludo-match-players { grid-template-columns: 1fr; }
+  .ludo-match-base { width: 54px; height: 54px; }
+  .ludo-match-base.tl, .ludo-match-base.tr, .ludo-match-base.br, .ludo-match-base.bl { top: 10px; left: 10px; }
+  .ludo-match-base.tr { left: auto; right: 10px; }
+  .ludo-match-base.br { top: auto; bottom: 10px; right: 10px; }
+  .ludo-match-base.bl { top: auto; bottom: 10px; }
+  .ludo-match-track { margin: 72px 66px; grid-template-columns: repeat(8, 1fr); }
+  .ludo-match-pawn { width: 12px; height: 12px; }
+}
+
 /* ========== LUDO BOARD V2 (4-corner dice style) ========== */
 .ludo-board-v2 {
   position: relative;

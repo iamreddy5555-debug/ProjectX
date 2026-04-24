@@ -3,6 +3,7 @@ const GameBet = require('../models/GameBet');
 const User = require('../models/User');
 const AdminControl = require('../models/AdminControl');
 const gameRounds = require('../services/gameRounds');
+const ludoMatch = require('../services/ludoMatch');
 const { auth } = require('../middleware/auth');
 const router = express.Router();
 
@@ -458,6 +459,54 @@ router.get('/history', auth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
+});
+
+// ===== LUDO MATCH (4-player rooms) =====
+router.post('/ludo-match/join', auth, async (req, res) => {
+  try {
+    const { stake } = req.body;
+    const amt = Number(stake);
+    if (!Number.isInteger(amt) || amt < 10 || amt > 10000) {
+      return res.status(400).json({ message: 'Stake must be a whole number ₹10-₹10000' });
+    }
+    const user = await User.findById(req.user.id);
+    const result = await ludoMatch.joinQueue(user._id, user.name, amt, req.body.socketId);
+    if (!result.ok) return res.status(400).json({ message: result.error });
+    res.json({ ...result });
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
+});
+
+router.post('/ludo-match/leave', auth, async (req, res) => {
+  try {
+    const result = await ludoMatch.leaveQueue(req.user.id);
+    if (!result.ok) return res.status(400).json({ message: result.error });
+    const u = await User.findById(req.user.id).select('balance');
+    res.json({ ...result, newBalance: u.balance });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/ludo-match/roll', auth, async (req, res) => {
+  try {
+    const { matchId } = req.body;
+    const result = await ludoMatch.doRoll(matchId, req.user.id, false);
+    if (!result.ok) return res.status(400).json({ message: result.error });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// Current match for this user (or queue status if waiting)
+router.get('/ludo-match/current', auth, (req, res) => {
+  const match = ludoMatch.getMatchForUser(req.user.id);
+  if (match) return res.json({ inMatch: true, match });
+  const q = ludoMatch.getQueueState(req.user.id);
+  if (q) return res.json({ inQueue: true, queue: q });
+  res.json({ idle: true });
 });
 
 module.exports = router;

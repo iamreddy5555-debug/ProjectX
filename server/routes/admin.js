@@ -444,7 +444,7 @@ router.get('/games/stats', adminAuth, async (req, res) => {
 
     // Top 10 users by stake volume per game
     const perGameUsers = {};
-    for (const gt of ['color', 'coinflip', 'aviator', 'ludo']) {
+    for (const gt of ['color', 'coinflip', 'aviator', 'ludo', 'ludo-match']) {
       const top = await GameBet.aggregate([
         { $match: { gameType: gt, status: 'settled' } },
         { $group: {
@@ -545,6 +545,17 @@ router.patch('/control', adminAuth, async (req, res) => {
     if (nextLudoMode && ['oneshot', 'persistent'].includes(nextLudoMode)) {
       ctl.nextLudoMode = nextLudoMode;
     }
+    // Ludo Match next-dice (for 4-player rooms)
+    const { nextLudoMatchDice, nextLudoMatchMode } = req.body;
+    if (nextLudoMatchDice === 'clear' || nextLudoMatchDice === null) {
+      ctl.nextLudoMatchDice = null;
+    } else if (typeof nextLudoMatchDice === 'number' && nextLudoMatchDice >= 1 && nextLudoMatchDice <= 6) {
+      ctl.nextLudoMatchDice = Math.floor(nextLudoMatchDice);
+    }
+    if (nextLudoMatchMode && ['oneshot', 'persistent'].includes(nextLudoMatchMode)) {
+      ctl.nextLudoMatchMode = nextLudoMatchMode;
+    }
+
     // Dice overrides: { red: 1-6 | null | 'clear', blue: ..., green: ..., yellow: ... }
     if (nextLudoDice && typeof nextLudoDice === 'object') {
       ctl.nextLudoDice = ctl.nextLudoDice || {};
