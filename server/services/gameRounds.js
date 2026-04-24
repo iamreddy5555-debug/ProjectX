@@ -146,9 +146,9 @@ const settleColorBets = async (roundId, number, colors) => {
   }
 };
 
-// ============ COIN FLIP (90s) ============
-const COIN_BET_MS = 80_000;
-const COIN_REVEAL_MS = 10_000;
+// ============ COIN FLIP (30s) ============
+const COIN_BET_MS = 25_000;
+const COIN_REVEAL_MS = 5_000;
 
 const startCoinflipRound = async () => {
   const now = Date.now();
@@ -466,7 +466,7 @@ const startAll = (io) => {
   startCoinflipRound().catch(e => console.error('coinflip loop error', e));
   startAviatorBetting().catch(e => console.error('aviator loop error', e));
   startLudoRound().catch(e => console.error('ludo loop error', e));
-  console.log('🎰 Live round scheduler started (color 30s, coinflip 90s, aviator continuous, ludo ~15s)');
+  console.log('🎰 Live round scheduler started (color 30s, coinflip 30s, aviator continuous, ludo ~15s)');
 };
 
 module.exports = {
