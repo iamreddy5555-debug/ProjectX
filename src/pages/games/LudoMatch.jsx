@@ -577,20 +577,24 @@ function LudoBoard({ match, liveMatch, diceAnim, me, isMyTurn, onPickPawn, compa
   );
 
   // All pawns (4 per player × 4 players = 16)
+  // Positioned absolutely so CSS transitions slide them between adjacent cells.
+  // The parent effect walks progress one step at a time (180ms/step) → visually glides.
   const pawnEls = [];
   for (const p of match.players) {
     for (const pawn of p.pawns) {
       const pos = cellFor(p.color, pawn.progress, pawn.id);
+      const leftPct = ((pos.col - 0.5) / 15) * 100;
+      const topPct  = ((pos.row - 0.5) / 15) * 100;
       const isMyPawn = me && p.color === me.color;
       const canMove = isMyTurn && isMyPawn && movableIds.includes(pawn.id);
       const isFinished = pawn.progress === FINISH;
       pawnEls.push(
         <button
-          key={`${p.color}-${pawn.id}-${pawn.progress}`}
+          key={`${p.color}-${pawn.id}`}
           className={`ludo-pawn-v2 ${canMove ? 'movable' : ''} ${isFinished ? 'finished' : ''}`}
           style={{
-            gridColumn: pos.col,
-            gridRow: pos.row,
+            left: `${leftPct}%`,
+            top: `${topPct}%`,
             background: COLOR_MAP[p.color].hex,
           }}
           onClick={() => canMove && onPickPawn(pawn.id)}
