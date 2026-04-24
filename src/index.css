@@ -4991,80 +4991,145 @@ a {
   box-shadow: 0 0 6px currentColor;
 }
 
-/* ========== Ludo Match — one-screen 3-column arena ========== */
-.ludo-arena {
+/* ========== Ludo Match — clean single-column layout ========== */
+.ludo-players-strip {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 220px;
-  gap: 14px;
-  align-items: start;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
-.ludo-side {
+.ludo-strip-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-md);
+  min-width: 0;
+  transition: all 0.2s;
+}
+
+.ludo-strip-card.turn {
+  border-color: var(--c);
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.05), 0 0 14px var(--c);
+  background: var(--soft);
+}
+
+.ludo-strip-card.winner {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.ludo-strip-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+
+.ludo-strip-info { min-width: 0; flex: 1; }
+
+.ludo-strip-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ludo-strip-meta {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Big turn banner */
+.ludo-turnbar-big {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ludo-turnbar-big.mine {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 800;
+  animation: live-pulse 1.8s ease-in-out infinite;
+}
+
+.ludo-turnbar-big strong { font-weight: 900; }
+
+.ludo-turnbar-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* Main board + action area */
+.ludo-main {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  position: sticky;
-  top: calc(var(--header-height) + 10px);
-  align-self: start;
+  align-items: center;
+  gap: 14px;
 }
 
-.ludo-side-hint {
-  padding: 10px 12px;
-  background: var(--bg-card);
-  border: 1.5px solid var(--accent-primary);
-  border-radius: var(--radius-md);
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-align: center;
-}
-
-.ludo-side-roll {
+.ludo-roll-main {
   width: 100%;
-  padding: 18px !important;
-  font-size: 1.1rem !important;
+  max-width: 520px;
+  padding: 16px !important;
+  font-size: 1.05rem !important;
   background: linear-gradient(180deg, #fbbf24, #d97706) !important;
-  color: var(--text-inverse) !important;
-  box-shadow: 0 6px 18px rgba(251, 191, 36, 0.35) !important;
+  color: #422006 !important;
+  box-shadow: 0 6px 18px rgba(251, 191, 36, 0.4) !important;
   animation: pawn-pulse 1.4s ease-in-out infinite;
 }
 
-.ludo-side-waiting {
-  padding: 16px 12px;
+.ludo-waiting-main {
+  width: 100%;
+  max-width: 520px;
+  padding: 14px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-md);
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-secondary);
-  line-height: 1.5;
-}
-
-.ludo-center-col {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Responsive: stack on narrow screens */
-@media (max-width: 960px) {
-  .ludo-arena {
-    grid-template-columns: 1fr;
-  }
-  .ludo-side {
-    position: static;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-  .ludo-side .ludo-match-player { flex: 1 1 45%; }
-  .ludo-side-roll { font-size: 1rem !important; padding: 14px !important; }
 }
 
 /* ========== Proper Ludo board v3 (4 pawns per player) ========== */
 .ludo-board-v3 {
   position: relative;
   margin: 0 auto;
-  max-width: 520px;
+  width: 100%;
+  max-width: 560px;
+}
+
+@media (max-width: 640px) {
+  .ludo-players-strip { grid-template-columns: repeat(2, 1fr); }
+  .ludo-turnbar-big { font-size: 0.85rem; padding: 10px; }
 }
 
 .ludo-board-dice {
@@ -5089,7 +5154,8 @@ a {
 }
 
 .ludo-quad-v2 {
-  border: 3px solid #1f2937;
+  border: 2px solid #1f2937;
+  box-shadow: inset 0 0 0 8px #fff, inset 0 0 0 10px #1f2937;
 }
 
 .ludo-cell {
