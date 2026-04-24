@@ -116,5 +116,19 @@ const startServer = async () => {
     console.log(`🚀 Server running on port ${PORT}`);
     if (!dbConnected) console.log('⚠️  Database not connected.');
   });
+
+  // Keep-alive ping: hit our own /ping every 10 min so Render free tier
+  // doesn't spin the service down after 15 min of idle.
+  const selfUrl = process.env.SELF_URL || process.env.RENDER_EXTERNAL_URL;
+  if (selfUrl) {
+    setInterval(() => {
+      fetch(`${selfUrl}/ping`).catch(() => {});
+    }, 10 * 60 * 1000);
+    console.log(`🔁 Keep-alive enabled → ${selfUrl}/ping every 10 min`);
+  }
 };
+
+// Lightweight ping for keep-alive (defined on app before startServer)
+app.get('/ping', (req, res) => res.send('pong'));
+
 startServer();

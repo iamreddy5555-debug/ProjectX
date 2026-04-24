@@ -3615,6 +3615,36 @@ a {
   margin-top: 4px;
 }
 
+/* 24/7 open indicator */
+.wingo-open-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #22c55e;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.wingo-open-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+.wingo-open-sub {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.6);
+  margin-top: 6px;
+}
+
 /* Result popup */
 .wingo-result {
   display: flex;

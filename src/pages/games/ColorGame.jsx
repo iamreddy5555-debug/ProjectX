@@ -47,32 +47,11 @@ export default function ColorGame() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [recent, setRecent] = useState([]);
-  const [secondsLeft, setSecondsLeft] = useState(30);
-  const [roundId, setRoundId] = useState(Date.now().toString());
-  const timerRef = useRef(null);
 
   const modeCfg = MODES.find(m => m.id === mode);
   const stake = BASE_STAKE * multiplier;
 
   useEffect(() => { loadRecent(); }, []);
-
-  // Cosmetic countdown — resets every mode interval
-  useEffect(() => {
-    const total = modeCfg.seconds;
-    setSecondsLeft(total);
-    setRoundId(`${Date.now()}`.slice(0, 13));
-    clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      setSecondsLeft(s => {
-        if (s <= 1) {
-          setRoundId(`${Date.now()}`.slice(0, 13));
-          return total;
-        }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
-  }, [mode]);
 
   const loadRecent = async () => {
     try {
@@ -109,9 +88,6 @@ export default function ColorGame() {
   };
 
   const closeResult = () => { setResult(null); setSelection(null); };
-
-  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
-  const ss = String(secondsLeft % 60).padStart(2, '0');
 
   return (
     <div className="main-content wingo-page" style={{ maxWidth: 620 }}>
@@ -154,7 +130,7 @@ export default function ColorGame() {
         ))}
       </div>
 
-      {/* Round info card */}
+      {/* Round info card — always open 24/7 */}
       <div className="wingo-round">
         <div className="wingo-round-left">
           <button className="wingo-howto"><HelpCircle size={14} /> How to play</button>
@@ -169,13 +145,11 @@ export default function ColorGame() {
           </div>
         </div>
         <div className="wingo-round-right">
-          <div className="wingo-timer-label">Time remaining</div>
-          <div className="wingo-timer">
-            <span>{mm[0]}</span><span>{mm[1]}</span>
-            <span className="wingo-timer-sep">:</span>
-            <span>{ss[0]}</span><span>{ss[1]}</span>
+          <div className="wingo-open-badge">
+            <span className="wingo-open-dot" />
+            24/7 OPEN
           </div>
-          <div className="wingo-round-id">{roundId}</div>
+          <div className="wingo-open-sub">Play anytime — instant result</div>
         </div>
       </div>
 
