@@ -1,0 +1,276 @@
+const express = require('express');
+const GameBet = require('../models/GameBet');
+const User = require('../models/User');
+const { auth } = require('../middleware/auth');
+const router = express.Router();
+
+const ALLOWED_STAKES = [49, 99, 299, 599, 999];
+
+// ===== Helpers =====
+const getUserChecked = async (userId, stake) => {
+  if (!ALLOWED_STAKES.includes(stake)) throw { code: 400, message: 'Invalid stake amount' };
+  const user = await User.findById(userId);
+  if (!user) throw { code: 404, message: 'User not found' };
+  if (user.banned) throw { code: 403, message: 'Account suspended' };
+  if (user.balance < stake) throw { code: 400, message: 'Insufficient balance' };
+  return user;
+};
+
+const creditUser = async (userId, amount) => {
+  if (amount > 0) await User.findByIdAndUpdate(userId, { $inc: { balance: amount } });
+};
+
+// ===== COLOR / NUMBER GAME =====
+// Rules:
+//  - Red   : result in {1,3,7,9}   → 2x
+//  - Green : result in {2,4,6,8}   → 2x
+//  - Violet: result in {0,5}       → 4.5x
+//  - Exact number match 0-9        → 9x
+const colorFromNumber = (n) => {
+  if (n === 0 || n === 5) return 'violet';
+  if ([1, 3, 7, 9].includes(n)) return 'red';
+  return 'green';
+};
+
+router.post('/color', auth, async (req, res) => {
+  try {
+    const { selection, stake } = req.body;
+    if (!selection) return res.status(400).json({ message: 'Selection required' });
+    const user = await getUserChecked(req.user.id, stake);
+
+    // Deduct stake
+    user.balance -= stake;
+    await user.save();
+
+    // Roll the result (0-9)
+    const roll = Math.floor(Math.random() * 10);
+    const resultColor = colorFromNumber(roll);
+
+    // Determine win
+    let multiplier = 0;
+    if (/^[0-9]$/.test(selection)) {
+      // Number bet
+      if (parseInt(selection, 10) === roll) multiplier = 9;
+    } else if (selection === 'red' && resultColor === 'red') multiplier = 2;
+    else if (selection === 'green' && resultColor === 'green') multiplier = 2;
+    else if (selection === 'violet' && resultColor === 'violet') multiplier = 4.5;
+
+    const payout = Math.round(stake * multiplier * 100) / 100;
+    const won = multiplier > 0;
+
+    const bet = await GameBet.create({
+      userId: user._id,
+      gameType: 'color',
+      selection,
+      stake,
+      outcome: `${roll}:${resultColor}`,
+      multiplier,
+      payout,
+      won,
+    });
+
+    if (won) await creditUser(user._id, payout);
+    const freshUser = await User.findById(user._id).select('balance');
+
+    res.json({
+      roll,
+      resultColor,
+      won,
+      multiplier,
+      payout,
+      bet,
+      newBalance: freshUser.balance,
+    });
+  } catch (err) {
+    res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// ===== COIN FLIP =====
+// 2x payout on win
+router.post('/coinflip', auth, async (req, res) => {
+  try {
+    const { selection, stake } = req.body;
+    if (!['heads', 'tails'].includes(selection)) {
+      return res.status(400).json({ message: 'Selection must be heads or tails' });
+    }
+    const user = await getUserChecked(req.user.id, stake);
+
+    user.balance -= stake;
+    await user.save();
+
+    const outcome = Math.random() < 0.5 ? 'heads' : 'tails';
+    const won = selection === outcome;
+    const multiplier = won ? 2 : 0;
+    const payout = won ? stake * 2 : 0;
+
+    const bet = await GameBet.create({
+      userId: user._id,
+      gameType: 'coinflip',
+      selection,
+      stake,
+      outcome,
+      multiplier,
+      payout,
+      won,
+    });
+
+    if (won) await creditUser(user._id, payout);
+    const freshUser = await User.findById(user._id).select('balance');
+
+    res.json({ outcome, won, multiplier, payout, bet, newBalance: freshUser.balance });
+  } catch (err) {
+    res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// ===== AVIATOR / CRASH =====
+// Flow:
+//   1. POST /aviator/start — deducts stake, generates crashPoint, returns bet id
+//   2. POST /aviator/cashout — settles at current multiplier (server-computed from elapsed time)
+//
+// Multiplier growth:  m(t) = 1 * 1.06^t   (t = seconds elapsed)
+// Crash point distribution (1% house edge):
+//   r in [0,1); crash = max(1.00, 0.99 / (1 - r)) capped at 50x
+const aviatorMultiplierAt = (startedAt) => {
+  const tSec = (Date.now() - new Date(startedAt).getTime()) / 1000;
+  return Math.max(1, Math.pow(1.06, tSec));
+};
+
+const generateCrashPoint = () => {
+  const r = Math.random();
+  const raw = 0.99 / (1 - r);
+  return Math.max(1.0, Math.min(50, Math.round(raw * 100) / 100));
+};
+
+router.post('/aviator/start', auth, async (req, res) => {
+  try {
+    const { stake } = req.body;
+    const user = await getUserChecked(req.user.id, stake);
+
+    user.balance -= stake;
+    await user.save();
+
+    const crashPoint = generateCrashPoint();
+    const bet = await GameBet.create({
+      userId: user._id,
+      gameType: 'aviator',
+      selection: 'aviator',
+      stake,
+      status: 'pending',
+      crashPoint,
+      startedAt: new Date(),
+    });
+
+    res.json({ betId: bet._id, startedAt: bet.startedAt, newBalance: user.balance });
+    // NOTE: crashPoint is NOT returned to client — they must cash out blind
+  } catch (err) {
+    res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+router.post('/aviator/cashout', auth, async (req, res) => {
+  try {
+    const { betId } = req.body;
+    const bet = await GameBet.findById(betId);
+    if (!bet || String(bet.userId) !== req.user.id) {
+      return res.status(404).json({ message: 'Bet not found' });
+    }
+    if (bet.gameType !== 'aviator') return res.status(400).json({ message: 'Not an aviator bet' });
+    if (bet.status !== 'pending') return res.status(400).json({ message: 'Bet already settled' });
+
+    const currentMultiplier = aviatorMultiplierAt(bet.startedAt);
+    const cappedMultiplier = Math.round(currentMultiplier * 100) / 100;
+
+    if (cappedMultiplier >= bet.crashPoint) {
+      // Crashed — user loses
+      bet.status = 'settled';
+      bet.outcome = 'crashed';
+      bet.multiplier = bet.crashPoint;
+      bet.payout = 0;
+      bet.won = false;
+      await bet.save();
+      const freshUser = await User.findById(req.user.id).select('balance');
+      return res.json({
+        won: false,
+        crashed: true,
+        crashPoint: bet.crashPoint,
+        multiplier: bet.crashPoint,
+        payout: 0,
+        newBalance: freshUser.balance,
+      });
+    }
+
+    // Successful cashout
+    const payout = Math.round(bet.stake * cappedMultiplier * 100) / 100;
+    bet.status = 'settled';
+    bet.outcome = 'cashout';
+    bet.multiplier = cappedMultiplier;
+    bet.payout = payout;
+    bet.won = true;
+    await bet.save();
+
+    await creditUser(bet.userId, payout);
+    const freshUser = await User.findById(req.user.id).select('balance');
+
+    res.json({
+      won: true,
+      crashed: false,
+      multiplier: cappedMultiplier,
+      payout,
+      crashPoint: bet.crashPoint,
+      newBalance: freshUser.balance,
+    });
+  } catch (err) {
+    res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// Check pending aviator bet (for page refresh resume)
+router.get('/aviator/pending', auth, async (req, res) => {
+  try {
+    const bet = await GameBet.findOne({
+      userId: req.user.id,
+      gameType: 'aviator',
+      status: 'pending',
+    }).sort({ createdAt: -1 });
+    if (!bet) return res.json({ pending: false });
+
+    // If it's been too long (likely crashed already), auto-settle as crash
+    const now = Date.now();
+    const elapsed = (now - new Date(bet.startedAt).getTime()) / 1000;
+    const mul = Math.pow(1.06, elapsed);
+    if (mul >= bet.crashPoint) {
+      bet.status = 'settled';
+      bet.outcome = 'crashed';
+      bet.multiplier = bet.crashPoint;
+      bet.payout = 0;
+      bet.won = false;
+      await bet.save();
+      return res.json({ pending: false, crashed: true, crashPoint: bet.crashPoint });
+    }
+
+    res.json({
+      pending: true,
+      betId: bet._id,
+      stake: bet.stake,
+      startedAt: bet.startedAt,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ===== HISTORY =====
+router.get('/history', auth, async (req, res) => {
+  try {
+    const bets = await GameBet.find({ userId: req.user.id, status: 'settled' })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json(bets);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;

@@ -9,6 +9,10 @@ import BetMatch from './pages/BetMatch';
 import MyBets from './pages/MyBets';
 import Wallet from './pages/Wallet';
 import Profile from './pages/Profile';
+import GamesLobby from './pages/games/GamesLobby';
+import ColorGame from './pages/games/ColorGame';
+import CoinFlip from './pages/games/CoinFlip';
+import Aviator from './pages/games/Aviator';
 import AdminLayout from './admin/AdminLayout';
 
 function ProtectedRoute({ children }) {
@@ -33,6 +37,10 @@ function AppRoutes() {
           <Route path="/my-bets" element={<ProtectedRoute><MyBets /></ProtectedRoute>} />
           <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/games" element={<GamesLobby />} />
+          <Route path="/games/color" element={<ProtectedRoute><ColorGame /></ProtectedRoute>} />
+          <Route path="/games/coinflip" element={<ProtectedRoute><CoinFlip /></ProtectedRoute>} />
+          <Route path="/games/aviator" element={<ProtectedRoute><Aviator /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

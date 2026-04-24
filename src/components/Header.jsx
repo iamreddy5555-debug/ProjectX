@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/formatters';
-import { Home, Target, Shield, Wallet, User } from 'lucide-react';
+import { Home, Target, Shield, Wallet, User, Gamepad2 } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Header() {
@@ -26,6 +26,9 @@ export default function Header() {
       <nav className="header-nav">
         <Link to="/" className={isActive('/')}>
           <Home size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Matches
+        </Link>
+        <Link to="/games" className={isActive('/games')}>
+          <Gamepad2 size={15} style={{ verticalAlign: 'middle', marginRight: 4 }} /> Games
         </Link>
         {user && (
           <Link to="/my-bets" className={isActive('/my-bets')}>

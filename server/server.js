@@ -43,6 +43,7 @@ app.use('/api/contests', require('./routes/contests'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/bets', require('./routes/bets'));
+app.use('/api/games', require('./routes/games'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Socket.IO
