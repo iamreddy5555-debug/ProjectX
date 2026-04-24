@@ -21,7 +21,13 @@ const crypto = require('crypto');
 const MATCH_SIZE = 4;
 const QUEUE_WAIT_MS = 60_000;
 const TURN_TIMEOUT_MS = 25_000;
-const BOT_THINK_MS = 2_500;
+// Natural-feeling bot pacing: usually 1.5–3s, sometimes up to 5s ("deliberating")
+const botDelay = () => {
+  if (Math.random() < 0.2) {
+    return 3000 + Math.floor(Math.random() * 2000); // 3000–5000ms (~20% of turns)
+  }
+  return 1500 + Math.floor(Math.random() * 1500);   // 1500–3000ms (~80%)
+};
 const COLORS = ['red', 'blue', 'green', 'yellow'];
 const HOUSE_CUT = 0.125;
 
@@ -258,7 +264,7 @@ const scheduleTurn = (matchId) => {
 
   if (current.isBot) {
     if (room.turnTimeout) clearTimeout(room.turnTimeout);
-    room.turnTimeout = setTimeout(() => botRoll(matchId), BOT_THINK_MS);
+    room.turnTimeout = setTimeout(() => botRoll(matchId), botDelay());
     return;
   }
 
@@ -352,7 +358,7 @@ const doRoll = async (matchId, userId, fromBot = false) => {
   if (options.length === 1) {
     if (current.isBot) {
       // Give the dice time to visually settle before the bot moves.
-      setTimeout(() => applyMove(matchId, options[0], roll), BOT_THINK_MS);
+      setTimeout(() => applyMove(matchId, options[0], roll), botDelay());
     } else {
       await applyMove(matchId, options[0], roll);
     }
@@ -363,7 +369,7 @@ const doRoll = async (matchId, userId, fromBot = false) => {
     if (current.isBot) {
       // Bot picks best move: prefer capture > finish > advance-further > leave-base
       const chosen = botChoose(room, current, options, roll);
-      setTimeout(() => applyMove(matchId, chosen, roll), BOT_THINK_MS);
+      setTimeout(() => applyMove(matchId, chosen, roll), botDelay());
     } else {
       // Timeout — if human doesn't pick, auto-pick first option after TURN_TIMEOUT_MS
       if (room.turnTimeout) clearTimeout(room.turnTimeout);
