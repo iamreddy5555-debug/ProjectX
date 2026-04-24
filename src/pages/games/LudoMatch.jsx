@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
-import { ArrowLeft, Wallet, Dice5, Users, X, Bot } from 'lucide-react';
+import { ArrowLeft, Wallet, Dice5, Users, X } from 'lucide-react';
 import api from '../../utils/api';
 import { getSocket, onGameEvent } from '../../utils/gameSocket';
 
@@ -251,7 +251,7 @@ export default function LudoMatch() {
               <li>8 safe squares (★) where pawns can't be captured</li>
               <li>After a full lap, enter your color's home column</li>
               <li>Exact roll required to finish</li>
-              <li>Waits up to 1 minute for real players, then AI bots fill empty seats</li>
+              <li>Table opens after up to 1 minute of matchmaking</li>
             </ul>
           </div>
 
@@ -293,7 +293,7 @@ export default function LudoMatch() {
           <div className="ludo-match-queue-bar">
             <div className="ludo-match-queue-fill" style={{ width: `${((queue?.waiting || 0) / (queue?.needed || 4)) * 100}%` }} />
           </div>
-          <div className="ludo-match-queue-timer">Bots join in <strong>{secondsLeft}s</strong> if seats aren't filled</div>
+          <div className="ludo-match-queue-timer">Table starts in <strong>{secondsLeft}s</strong></div>
           <button className="btn btn-danger btn-lg" onClick={leave} disabled={busy} style={{ marginTop: 20 }}>
             <X size={16} /> Leave Queue (refunds ₹{queue?.stake})
           </button>
@@ -312,7 +312,7 @@ export default function LudoMatch() {
                 <div key={i} className={`ludo-strip-card ${isTurn ? 'turn' : ''} ${p.rank === 1 ? 'winner' : ''}`}
                   style={{ '--c': c.hex, '--soft': c.soft }}>
                   <div className="ludo-strip-avatar" style={{ background: c.hex }}>
-                    {p.isBot ? <Bot size={16} color="white" /> : p.name.charAt(0).toUpperCase()}
+                    {p.name?.charAt(0).toUpperCase()}
                   </div>
                   <div className="ludo-strip-info">
                     <div className="ludo-strip-name">{p.name}</div>

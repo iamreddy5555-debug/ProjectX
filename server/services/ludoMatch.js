@@ -129,7 +129,7 @@ const publicState = (room) => ({
     userId: String(p.userId || ''),
     name: p.name,
     color: p.color,
-    isBot: !!p.isBot,
+    // Intentionally not exposing isBot to clients — filled seats look real.
     rank: p.rank || null,
     pawns: p.pawns.map(pn => ({
       id: pn.id,
@@ -159,9 +159,24 @@ const fillAndStartRoom = async () => {
   }
 
   const botsNeeded = MATCH_SIZE - sameStake.length;
-  const botNames = ['Bot-Raj', 'Bot-Amit', 'Bot-Priya', 'Bot-Neha'];
+  // Realistic name pool so filled seats are indistinguishable from real players
+  const namePool = [
+    'Raj', 'Priya', 'Karan', 'Neha', 'Arjun', 'Ananya', 'Rohit', 'Pooja',
+    'Amit', 'Kiara', 'Vikram', 'Sneha', 'Rahul', 'Meera', 'Aditya', 'Isha',
+    'Sameer', 'Kavya', 'Dev', 'Riya', 'Akash', 'Nisha', 'Varun', 'Tanya',
+    'Harsh', 'Deepika', 'Shivam', 'Aanya', 'Yash', 'Simran',
+  ];
+  // Avoid duplicating names already at the table
+  const taken = new Set(sameStake.map(p => p.name));
+  const shuffledPool = [...namePool].sort(() => Math.random() - 0.5)
+    .filter(n => !taken.has(n));
   for (let i = 0; i < botsNeeded; i++) {
-    sameStake.push({ userId: null, name: botNames[i], stake: firstStake, isBot: true });
+    sameStake.push({
+      userId: null,
+      name: shuffledPool[i] || `Player${Math.floor(Math.random() * 900) + 100}`,
+      stake: firstStake,
+      isBot: true,
+    });
   }
 
   const shuffled = [...COLORS].sort(() => Math.random() - 0.5);
