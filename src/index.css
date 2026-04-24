@@ -6293,6 +6293,160 @@ a {
   font-weight: 800;
 }
 
+/* ========== Admin: Live Ludo Matches dashboard ========== */
+.ludo-match-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+.ludo-match-admin-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lmac-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.lmac-head-info { flex: 1; min-width: 0; }
+
+.lmac-id {
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.lmac-meta {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.lmac-meta strong { color: var(--accent-primary); font-weight: 700; }
+
+.lmac-status {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.lmac-status.playing {
+  background: var(--accent-success-light);
+  color: var(--accent-success);
+}
+
+.lmac-status.finished {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+.lmac-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.lmac-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  min-width: 0;
+}
+
+.lmac-player.current {
+  border-color: var(--c);
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0 12px var(--c);
+}
+
+.lmac-player-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 6px var(--c);
+  flex-shrink: 0;
+}
+
+.lmac-player-info { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+
+.lmac-player-name {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lmac-bot-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.lmac-player-meta {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+}
+
+.lmac-override {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.lmac-dice-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.lmac-persistent-row {
+  padding-top: 4px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.lmac-persistent-row .btn { font-size: 0.75rem; padding: 4px 6px; }
+
+.lmac-dice-row .control-num { flex: 1; min-width: 0; }
+
+@media (max-width: 640px) {
+  .ludo-match-grid { grid-template-columns: 1fr; }
+}
+
 /* Dice control (Ludo) */
 .dice-control {
   margin-top: 10px;

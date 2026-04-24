@@ -24,6 +24,7 @@ export default function AdminGames() {
   const [stats, setStats] = useState(null);
   const [control, setControl] = useState(null);
   const [bets, setBets] = useState({ color: [], coinflip: [], aviator: [], ludo: [], 'ludo-match': [] });
+  const [liveLudoMatches, setLiveLudoMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [activeGame, setActiveGame] = useState('color');
@@ -65,7 +66,7 @@ export default function AdminGames() {
   const loadAll = async (initial = false) => {
     if (initial) setLoading(true);
     try {
-      const [s, c, bColor, bCoin, bAviator, bLudo, bLudoMatch] = await Promise.all([
+      const [s, c, bColor, bCoin, bAviator, bLudo, bLudoMatch, lmList] = await Promise.all([
         api.get('/admin/games/stats'),
         api.get('/admin/control'),
         api.get('/admin/games/bets?game=color&limit=25'),
@@ -73,6 +74,7 @@ export default function AdminGames() {
         api.get('/admin/games/bets?game=aviator&limit=25'),
         api.get('/admin/games/bets?game=ludo&limit=25'),
         api.get('/admin/games/bets?game=ludo-match&limit=25'),
+        api.get('/admin/ludo-matches'),
       ]);
       setStats(s.data);
       setControl(c.data);
@@ -80,6 +82,7 @@ export default function AdminGames() {
         color: bColor.data, coinflip: bCoin.data, aviator: bAviator.data,
         ludo: bLudo.data, 'ludo-match': bLudoMatch.data,
       });
+      setLiveLudoMatches(lmList.data || []);
       setLastUpdate(new Date());
       if (!initial) {
         setPulse(true);
@@ -159,6 +162,17 @@ export default function AdminGames() {
         showToast(`${color} dice forced to ${value}`);
       }
     } catch (err) { showToast('Failed'); }
+  };
+
+  // Target dice for a specific live match by id
+  const setMatchDice = async (matchId, dice, mode = 'oneshot') => {
+    try {
+      await api.patch(`/admin/ludo-matches/${matchId}/dice`, { dice, mode });
+      showToast(dice === 'clear' ? 'Override cleared' : `Match dice → ${dice} (${mode})`);
+      loadAll(false);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed');
+    }
   };
 
   const setLudoMatchDice = async (value, mode = 'oneshot') => {
@@ -630,6 +644,117 @@ export default function AdminGames() {
           )}
         </div>
       </div>
+
+      {/* Live Ludo Matches dashboard — separate per-match control */}
+      {(section === 'overview' || section === 'ludo-match') && (
+        <div className="admin-section">
+          <h2 className="admin-section-title">
+            <span className="live-pill-dot" style={{ color: '#22c55e' }} />
+            Live Ludo Matches ({liveLudoMatches.length})
+          </h2>
+          <p className="admin-page-subtitle" style={{ marginBottom: 14 }}>
+            Each match is independent. Set dice per match to steer specific rooms without affecting the others.
+          </p>
+
+          {liveLudoMatches.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon-wrap"><Dice5 size={28} /></div>
+              <div className="empty-state-title">No active Ludo matches</div>
+              <div className="empty-state-desc">When players join tables, live matches will show here.</div>
+            </div>
+          ) : (
+            <div className="ludo-match-grid">
+              {liveLudoMatches.map(m => (
+                <div key={m.matchId} className="ludo-match-admin-card">
+                  <div className="lmac-head">
+                    <div className="lmac-head-info">
+                      <div className="lmac-id">Match {m.matchId.slice(-10)}</div>
+                      <div className="lmac-meta">
+                        Pot ₹{m.pot} · Stake ₹{m.stake} · Turn {m.currentTurn + 1}/4
+                        {typeof m.lastRoll === 'number' && m.lastRoll > 0 && <> · Last roll: <strong>{m.lastRoll}</strong></>}
+                      </div>
+                    </div>
+                    <span className={`lmac-status ${m.phase}`}>{m.phase}</span>
+                  </div>
+
+                  {/* Players */}
+                  <div className="lmac-players">
+                    {m.players.map((p, idx) => {
+                      const detailed = m.playersDetailed?.[idx];
+                      const isCurrent = idx === m.currentTurn && m.phase === 'playing';
+                      const homeCount = p.pawns.filter(pn => pn.progress === 57).length;
+                      const color = {
+                        red: '#ef4444', blue: '#3b82f6',
+                        green: '#22c55e', yellow: '#eab308',
+                      }[p.color];
+                      return (
+                        <div key={idx} className={`lmac-player ${isCurrent ? 'current' : ''}`} style={{ '--c': color }}>
+                          <span className="lmac-player-dot" />
+                          <div className="lmac-player-info">
+                            <span className="lmac-player-name">
+                              {p.name}
+                              {detailed?.isBot && <span className="lmac-bot-tag">AI</span>}
+                            </span>
+                            <span className="lmac-player-meta">{homeCount}/4 home</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Current override */}
+                  <div className="lmac-override">
+                    Next dice:
+                    {typeof m.nextDice === 'number' ? (
+                      <span className="control-pill active">
+                        {m.nextDice} ({m.nextDiceMode})
+                      </span>
+                    ) : (
+                      <span className="control-pill none">Random</span>
+                    )}
+                  </div>
+
+                  {/* Dice 1-6 buttons */}
+                  <div className="lmac-dice-row">
+                    {[1,2,3,4,5,6].map(v => (
+                      <button
+                        key={v}
+                        className={`control-num ${m.nextDice === v ? 'selected' : ''}`}
+                        onClick={() => setMatchDice(m.matchId, v, 'oneshot')}
+                        title={`Force next roll to ${v} (one-shot)`}
+                      >
+                        {v}
+                      </button>
+                    ))}
+                    <button
+                      className="btn btn-danger btn-sm"
+                      style={{ marginLeft: 4 }}
+                      onClick={() => setMatchDice(m.matchId, 'clear')}
+                      title="Clear override"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="lmac-dice-row lmac-persistent-row">
+                    {[1,2,3,4,5,6].map(v => (
+                      <button
+                        key={v}
+                        className="btn btn-outline btn-sm"
+                        style={{ flex: 1, minWidth: 0 }}
+                        onClick={() => setMatchDice(m.matchId, v, 'persistent')}
+                        title={`Force every roll to ${v} until cleared`}
+                      >
+                        {v}•
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Live bets feed per game */}
       <div className="admin-section">

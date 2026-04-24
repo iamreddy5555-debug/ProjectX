@@ -9,6 +9,7 @@ const Payment = require('../models/Payment');
 const Bet = require('../models/Bet');
 const GameBet = require('../models/GameBet');
 const AdminControl = require('../models/AdminControl');
+const ludoMatch = require('../services/ludoMatch');
 const QRCode = require('../models/QRCode');
 const ChatMessage = require('../models/ChatMessage');
 const { adminAuth } = require('../middleware/auth');
@@ -409,6 +410,26 @@ router.post('/chats/:userId', adminAuth, async (req, res) => {
     await msg.save();
     res.status(201).json(msg);
   } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ===== LIVE LUDO MATCHES (per-match admin control) =====
+router.get('/ludo-matches', adminAuth, (req, res) => {
+  try {
+    res.json(ludoMatch.getActiveMatches());
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.patch('/ludo-matches/:matchId/dice', adminAuth, (req, res) => {
+  try {
+    const { dice, mode } = req.body;
+    const result = ludoMatch.setMatchDice(req.params.matchId, dice, mode);
+    if (!result.ok) return res.status(404).json({ message: result.error });
+    res.json(result);
+  } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
 });

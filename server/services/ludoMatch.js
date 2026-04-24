@@ -222,6 +222,9 @@ const fillAndStartRoom = async () => {
     awaitingMove: null,          // { roll, options: [pawnId,...] }
     turnTimeout: null,
     rankCounter: 0,              // increments when a player finishes all 4 pawns
+    nextDice: null,              // per-match admin dice override (1-6)
+    nextDiceMode: 'oneshot',
+    createdAt: new Date(),
   };
   rooms.set(matchId, room);
   for (const p of players) {
@@ -278,7 +281,16 @@ const advanceTurn = (matchId) => {
   scheduleTurn(matchId);
 };
 
-const rollDice = async (control) => {
+const rollDice = async (control, room) => {
+  // Per-match override (admin targeted this specific room)
+  if (room && typeof room.nextDice === 'number') {
+    const v = room.nextDice;
+    if (room.nextDiceMode !== 'persistent') {
+      room.nextDice = null;
+    }
+    return v;
+  }
+  // Global override (applies to any match's next roll)
   if (typeof control.nextLudoMatchDice === 'number') {
     const v = control.nextLudoMatchDice;
     if (control.nextLudoMatchMode === 'oneshot') {
@@ -307,7 +319,7 @@ const doRoll = async (matchId, userId, fromBot = false) => {
   if (room.turnTimeout) { clearTimeout(room.turnTimeout); room.turnTimeout = null; }
 
   const control = await AdminControl.getSingleton();
-  const roll = await rollDice(control);
+  const roll = await rollDice(control, room);
   room.lastRoll = roll;
 
   broadcast(matchId, 'ludomatch:roll', { color: current.color, roll });
@@ -538,6 +550,44 @@ const leaveQueue = async (userId) => {
   return { ok: true, refunded: entry.stake };
 };
 
+// ==== Admin getters/setters (per-match) ====
+const getActiveMatches = () => {
+  const out = [];
+  for (const room of rooms.values()) {
+    out.push({
+      ...publicState(room),
+      nextDice: room.nextDice ?? null,
+      nextDiceMode: room.nextDiceMode || 'oneshot',
+      createdAt: room.createdAt,
+      // Also reveal isBot in admin view so admin can tell which seats are AI
+      playersDetailed: room.players.map(p => ({
+        userId: String(p.userId || ''),
+        name: p.name,
+        color: p.color,
+        isBot: !!p.isBot,
+        rank: p.rank || null,
+      })),
+    });
+  }
+  // Newest first
+  out.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return out;
+};
+
+const setMatchDice = (matchId, dice, mode = 'oneshot') => {
+  const room = rooms.get(matchId);
+  if (!room) return { ok: false, error: 'Match not found' };
+  if (dice === 'clear' || dice === null) {
+    room.nextDice = null;
+  } else if (typeof dice === 'number' && dice >= 1 && dice <= 6) {
+    room.nextDice = Math.floor(dice);
+    room.nextDiceMode = mode === 'persistent' ? 'persistent' : 'oneshot';
+  } else {
+    return { ok: false, error: 'Dice must be 1-6' };
+  }
+  return { ok: true, nextDice: room.nextDice, nextDiceMode: room.nextDiceMode };
+};
+
 const getMatchForUser = (userId) => {
   const matchId = userMatches.get(String(userId));
   if (!matchId) return null;
@@ -576,6 +626,9 @@ module.exports = {
   pickPawn,
   getMatchForUser,
   getQueueState,
+  // Admin-only
+  getActiveMatches,
+  setMatchDice,
   // constants for client-side path math
   COLOR_START,
   SAFE_SET,
