@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
-import { Gamepad2, Palette, Coins, Plane, Users, TrendingUp, TrendingDown, RefreshCw, Zap, Pause, Play } from 'lucide-react';
+import { Gamepad2, Palette, Coins, Plane, Users, TrendingUp, TrendingDown, RefreshCw, Zap, Pause, Play, Dice5 } from 'lucide-react';
 import api from '../utils/api';
 
 const POLL_INTERVAL = 4000; // 4 seconds
@@ -9,12 +9,20 @@ const GAME_LABELS = {
   color:    { name: 'Color / Number', icon: Palette, color: '#a855f7' },
   coinflip: { name: 'Coin Flip',      icon: Coins,   color: '#fbbf24' },
   aviator:  { name: 'Aviator',        icon: Plane,   color: '#ef4444' },
+  ludo:     { name: 'Ludo Race',      icon: Dice5,   color: '#22c55e' },
 };
+
+const LUDO_COLORS = [
+  { id: 'red',    hex: '#ef4444' },
+  { id: 'blue',   hex: '#3b82f6' },
+  { id: 'green',  hex: '#22c55e' },
+  { id: 'yellow', hex: '#fbbf24' },
+];
 
 export default function AdminGames() {
   const [stats, setStats] = useState(null);
   const [control, setControl] = useState(null);
-  const [bets, setBets] = useState({ color: [], coinflip: [], aviator: [] });
+  const [bets, setBets] = useState({ color: [], coinflip: [], aviator: [], ludo: [] });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [activeGame, setActiveGame] = useState('color');
@@ -55,16 +63,17 @@ export default function AdminGames() {
   const loadAll = async (initial = false) => {
     if (initial) setLoading(true);
     try {
-      const [s, c, bColor, bCoin, bAviator] = await Promise.all([
+      const [s, c, bColor, bCoin, bAviator, bLudo] = await Promise.all([
         api.get('/admin/games/stats'),
         api.get('/admin/control'),
         api.get('/admin/games/bets?game=color&limit=25'),
         api.get('/admin/games/bets?game=coinflip&limit=25'),
         api.get('/admin/games/bets?game=aviator&limit=25'),
+        api.get('/admin/games/bets?game=ludo&limit=25'),
       ]);
       setStats(s.data);
       setControl(c.data);
-      setBets({ color: bColor.data, coinflip: bCoin.data, aviator: bAviator.data });
+      setBets({ color: bColor.data, coinflip: bCoin.data, aviator: bAviator.data, ludo: bLudo.data });
       setLastUpdate(new Date());
       if (!initial) {
         setPulse(true);
@@ -101,6 +110,9 @@ export default function AdminGames() {
     if (bet.gameType === 'aviator') {
       return `Aviator @ ${bet.multiplier?.toFixed(2) || '?'}×`;
     }
+    if (bet.gameType === 'ludo') {
+      return `${bet.selection}`;
+    }
     return bet.selection;
   };
 
@@ -117,7 +129,18 @@ export default function AdminGames() {
       if (bet.outcome === 'cashout') return `Cashed @ ${bet.multiplier?.toFixed(2)}×`;
       return bet.outcome || 'pending';
     }
+    if (bet.gameType === 'ludo') {
+      return `${bet.outcome} won`;
+    }
     return bet.outcome;
+  };
+
+  const setNextLudoWinner = async (color, mode = 'oneshot') => {
+    try {
+      const res = await api.patch('/admin/control', { nextLudoWinner: color, nextLudoMode: mode });
+      setControl(res.data);
+      showToast(color === 'clear' ? 'Cleared Ludo override' : `Next Ludo winner: ${color} (${mode})`);
+    } catch (err) { showToast('Failed'); }
   };
 
   const secondsAgo = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / 1000) : null;
@@ -384,6 +407,57 @@ export default function AdminGames() {
             </div>
 
             <button className="btn btn-danger btn-sm control-clear" onClick={() => setNextAviatorCrash('clear')}>
+              Clear override
+            </button>
+          </div>
+
+          {/* Ludo control */}
+          <div className="control-card">
+            <div className="control-head">
+              <Dice5 size={18} style={{ color: '#22c55e' }} />
+              <h3>Ludo Race</h3>
+            </div>
+            <p className="control-desc">Force the next race winner. Pawn that wins pays 3.6×.</p>
+
+            <div className="control-current">
+              Current override:
+              {control?.nextLudoWinner ? (
+                <span className="control-pill active" style={{ textTransform: 'capitalize' }}>
+                  {control.nextLudoWinner} wins ({control.nextLudoMode})
+                </span>
+              ) : (
+                <span className="control-pill none">None (random)</span>
+              )}
+            </div>
+
+            <div className="control-subhead">Force Winner</div>
+            <div className="control-color-picker">
+              {LUDO_COLORS.map(c => (
+                <button
+                  key={c.id}
+                  className={`control-color-btn ${control?.nextLudoWinner === c.id ? 'selected' : ''}`}
+                  style={{ background: c.hex, textTransform: 'capitalize' }}
+                  onClick={() => setNextLudoWinner(c.id)}
+                >
+                  {c.id}
+                </button>
+              ))}
+            </div>
+
+            <div className="control-row">
+              {LUDO_COLORS.map(c => (
+                <button
+                  key={c.id}
+                  className="btn btn-outline btn-sm"
+                  style={{ textTransform: 'capitalize', flex: 1, minWidth: 0 }}
+                  onClick={() => setNextLudoWinner(c.id, 'persistent')}
+                >
+                  {c.id} persistent
+                </button>
+              ))}
+            </div>
+
+            <button className="btn btn-danger btn-sm control-clear" onClick={() => setNextLudoWinner('clear')}>
               Clear override
             </button>
           </div>

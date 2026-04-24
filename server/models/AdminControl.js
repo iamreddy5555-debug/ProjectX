@@ -16,6 +16,12 @@ const adminControlSchema = new mongoose.Schema({
   nextAviatorMode: { type: String, enum: ['oneshot', 'persistent'], default: 'oneshot' },
   nextAviatorSetBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   nextAviatorSetAt: { type: Date },
+
+  // Force the next Ludo winner color. null = random.
+  nextLudoWinner: { type: String, enum: ['red', 'blue', 'green', 'yellow', null], default: null },
+  nextLudoMode: { type: String, enum: ['oneshot', 'persistent'], default: 'oneshot' },
+  nextLudoSetBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  nextLudoSetAt: { type: Date },
 }, { timestamps: true, _id: false });
 
 adminControlSchema.statics.getSingleton = async function () {

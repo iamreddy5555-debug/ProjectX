@@ -405,7 +405,7 @@ router.get('/games/stats', adminAuth, async (req, res) => {
 
     // Top 10 users by stake volume per game
     const perGameUsers = {};
-    for (const gt of ['color', 'coinflip', 'aviator']) {
+    for (const gt of ['color', 'coinflip', 'aviator', 'ludo']) {
       const top = await GameBet.aggregate([
         { $match: { gameType: gt, status: 'settled' } },
         { $group: {
@@ -493,6 +493,18 @@ router.patch('/control', adminAuth, async (req, res) => {
 
     if (nextAviatorMode && ['oneshot', 'persistent'].includes(nextAviatorMode)) {
       ctl.nextAviatorMode = nextAviatorMode;
+    }
+
+    const { nextLudoWinner, nextLudoMode } = req.body;
+    if (nextLudoWinner === 'clear' || nextLudoWinner === null) {
+      ctl.nextLudoWinner = null;
+    } else if (['red', 'blue', 'green', 'yellow'].includes(nextLudoWinner)) {
+      ctl.nextLudoWinner = nextLudoWinner;
+      ctl.nextLudoSetBy = req.user.id;
+      ctl.nextLudoSetAt = new Date();
+    }
+    if (nextLudoMode && ['oneshot', 'persistent'].includes(nextLudoMode)) {
+      ctl.nextLudoMode = nextLudoMode;
     }
 
     await ctl.save();

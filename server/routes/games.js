@@ -11,6 +11,7 @@ const GAME_LIMITS = {
   color:    { min: 10, max: 10000 },
   coinflip: { min: 20, max: 10000 },
   aviator:  { min: 10, max: 10000 },
+  ludo:     { min: 10, max: 10000 },
 };
 
 // ===== Helpers =====
@@ -191,6 +192,116 @@ router.post('/coinflip', auth, async (req, res) => {
     res.json({ outcome, won, multiplier, payout, bet, newBalance: freshUser.balance });
   } catch (err) {
     res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// ===== LUDO DICE RACE =====
+// User bets on one of 4 colors (red/blue/green/yellow). Server picks
+// the winner (random, or forced by admin), returns it plus an animation
+// script of dice rolls so the client can run a 4-pawn race visually.
+// Payout: 3.6× on win (4 colors, 10% house edge).
+const LUDO_COLORS = ['red', 'blue', 'green', 'yellow'];
+const LUDO_PAYOUT = 3.6;
+const LUDO_TRACK_LENGTH = 50;
+
+const generateLudoRace = (winner) => {
+  // Produce a sequence of turns; each turn rolls a die for each color.
+  // At the end, the chosen winner must be the first to reach TRACK_LENGTH.
+  const positions = { red: 0, blue: 0, green: 0, yellow: 0 };
+  const rolls = [];
+  let safety = 60;
+
+  while (positions[winner] < LUDO_TRACK_LENGTH && safety-- > 0) {
+    const turn = {};
+    for (const c of LUDO_COLORS) {
+      // Give the winner a slightly better dice distribution so it finishes first
+      const max = c === winner ? 6 : 5;
+      const min = c === winner ? 2 : 1;
+      const roll = Math.floor(Math.random() * (max - min + 1)) + min;
+      // Don't let non-winners overtake the winner
+      const next = positions[c] + roll;
+      if (c !== winner && next >= LUDO_TRACK_LENGTH) {
+        turn[c] = Math.max(1, LUDO_TRACK_LENGTH - 1 - positions[c]);
+      } else {
+        turn[c] = roll;
+      }
+      positions[c] += turn[c];
+    }
+    rolls.push(turn);
+  }
+
+  // Snap winner to finish
+  positions[winner] = LUDO_TRACK_LENGTH;
+  return { rolls, finalPositions: positions };
+};
+
+router.post('/ludo', auth, async (req, res) => {
+  try {
+    const { selection, stake } = req.body;
+    if (!LUDO_COLORS.includes(selection)) {
+      return res.status(400).json({ message: `Pick one of: ${LUDO_COLORS.join(', ')}` });
+    }
+    const user = await getUserChecked(req.user.id, stake, 'ludo');
+
+    user.balance -= stake;
+    await user.save();
+
+    // Admin override for winner
+    const control = await AdminControl.getSingleton();
+    let winner;
+    if (control.nextLudoWinner && LUDO_COLORS.includes(control.nextLudoWinner)) {
+      winner = control.nextLudoWinner;
+      if (control.nextLudoMode === 'oneshot') {
+        control.nextLudoWinner = null;
+        await control.save();
+      }
+    } else {
+      winner = LUDO_COLORS[Math.floor(Math.random() * LUDO_COLORS.length)];
+    }
+
+    const race = generateLudoRace(winner);
+    const won = selection === winner;
+    const multiplier = won ? LUDO_PAYOUT : 0;
+    const payout = won ? Math.round(stake * LUDO_PAYOUT * 100) / 100 : 0;
+
+    const bet = await GameBet.create({
+      userId: user._id,
+      gameType: 'ludo',
+      selection,
+      stake,
+      outcome: winner,
+      multiplier,
+      payout,
+      won,
+    });
+
+    if (won) await creditUser(user._id, payout);
+    const freshUser = await User.findById(user._id).select('balance');
+
+    res.json({
+      winner,
+      race,               // { rolls: [...], finalPositions: {...} }
+      won,
+      multiplier,
+      payout,
+      bet,
+      newBalance: freshUser.balance,
+    });
+  } catch (err) {
+    res.status(err.code || 500).json({ message: err.message || 'Server error' });
+  }
+});
+
+// Recent Ludo winners for history
+router.get('/ludo/recent', async (req, res) => {
+  try {
+    const bets = await GameBet.find({ gameType: 'ludo', status: 'settled' })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('outcome createdAt');
+    res.json(bets.map(b => ({ winner: b.outcome, at: b.createdAt })));
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

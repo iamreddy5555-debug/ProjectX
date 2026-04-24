@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../utils/formatters';
-import { Wallet, Palette, Coins, Plane, Flame, Sparkles } from 'lucide-react';
+import { Wallet, Palette, Coins, Plane, Flame, Sparkles, Dice5 } from 'lucide-react';
 
 const GAMES = [
   {
@@ -22,6 +22,16 @@ const GAMES = [
     icon: Palette,
     gradient: 'linear-gradient(135deg, #ef4444 0%, #10b981 50%, #8b5cf6 100%)',
     maxPayout: '9×',
+    hot: true,
+  },
+  {
+    id: 'ludo',
+    path: '/games/ludo',
+    name: 'Ludo Race',
+    tagline: 'Pick a color, win 3.6×',
+    icon: Dice5,
+    gradient: 'linear-gradient(135deg, #ef4444 0%, #fbbf24 33%, #22c55e 66%, #3b82f6 100%)',
+    maxPayout: '3.6×',
     hot: true,
   },
   {

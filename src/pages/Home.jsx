@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { formatTime } from '../utils/formatters';
-import { Trophy, Clock, Zap, ChevronRight, Palette, Coins, Plane, Flame, Sparkles, Star } from 'lucide-react';
+import { Trophy, Clock, Zap, ChevronRight, Palette, Coins, Plane, Flame, Sparkles, Star, Dice5 } from 'lucide-react';
 import api from '../utils/api';
 
 const TEAM_COLORS = {
@@ -40,8 +40,8 @@ const BANNERS = [
 const GAME_TILES = [
   { name: 'Aviator', tagline: 'Crash game', icon: Plane, path: '/games/aviator', gradient: 'linear-gradient(135deg, #4f46e5 0%, #ec4899 100%)', hot: true },
   { name: 'Color & Number', tagline: 'Parity style', icon: Palette, path: '/games/color', gradient: 'linear-gradient(135deg, #ef4444 0%, #10b981 50%, #8b5cf6 100%)', hot: true },
+  { name: 'Ludo Race', tagline: 'Pick the winner', icon: Dice5, path: '/games/ludo', gradient: 'linear-gradient(135deg, #ef4444 0%, #fbbf24 33%, #22c55e 66%, #3b82f6 100%)', hot: true },
   { name: 'Coin Flip', tagline: '50/50 shot', icon: Coins, path: '/games/coinflip', gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' },
-  { name: 'Cricket Bets', tagline: 'Match winner', icon: Trophy, path: '/', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
 ];
 
 export default function Home() {

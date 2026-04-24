@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const gameBetSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  gameType: { type: String, enum: ['color', 'coinflip', 'aviator'], required: true },
+  gameType: { type: String, enum: ['color', 'coinflip', 'aviator', 'ludo'], required: true },
   selection: { type: String, required: true },   // 'red', 'green', 'violet', '0'-'9', 'heads', 'tails', or 'aviator-pending'
   stake: { type: Number, required: true, min: 1 },
   outcome: { type: String, default: '' },         // e.g. the rolled number, 'heads'/'tails', or 'crashed'/'cashout'

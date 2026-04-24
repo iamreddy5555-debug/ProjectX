@@ -14,6 +14,7 @@ import GamesLobby from './pages/games/GamesLobby';
 import ColorGame from './pages/games/ColorGame';
 import CoinFlip from './pages/games/CoinFlip';
 import Aviator from './pages/games/Aviator';
+import LudoGame from './pages/games/LudoGame';
 import AdminLayout from './admin/AdminLayout';
 
 function ProtectedRoute({ children }) {
@@ -45,6 +46,7 @@ function AppRoutes() {
           <Route path="/games/color" element={<ProtectedRoute><ColorGame /></ProtectedRoute>} />
           <Route path="/games/coinflip" element={<ProtectedRoute><CoinFlip /></ProtectedRoute>} />
           <Route path="/games/aviator" element={<ProtectedRoute><Aviator /></ProtectedRoute>} />
+          <Route path="/games/ludo" element={<ProtectedRoute><LudoGame /></ProtectedRoute>} />
           <Route path="/admin" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
