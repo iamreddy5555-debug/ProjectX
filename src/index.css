@@ -4717,63 +4717,291 @@ a {
   color: white;
 }
 
+/* ========== BOTTOM NAV (mobile) ========== */
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.98) 0%, rgba(10, 14, 26, 0.98) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-light);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  z-index: 95;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.3);
+  justify-content: space-around;
+  align-items: stretch;
+}
+
+.bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  min-width: 0;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+
+.bottom-nav-item.active {
+  color: var(--accent-primary);
+}
+
+.bottom-nav-item.active svg {
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.5));
+}
+
+/* Admin mobile bar (hamburger + page title) */
+.admin-mobile-bar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: var(--header-height);
+  z-index: 50;
+}
+
+.admin-mobile-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.admin-mobile-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.admin-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 90;
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.mobile-only { display: none; }
+
 /* ========== MOBILE RESPONSIVENESS ========== */
 @media (max-width: 768px) {
-  .header { padding: 0 16px; }
+  :root { --header-height: 56px; }
+
+  /* Header */
+  .header { padding: 0 12px; }
   .header-nav { display: none; }
-  .main-content { padding: 16px; }
+  .header-logo { font-size: 1.15rem; }
+  .header-logo .logo-icon { width: 32px; height: 32px; font-size: 1rem; }
+  .header-actions { gap: 6px; }
+  .user-balance { padding: 4px 10px; font-size: 0.75rem; }
+
+  /* Main content — add clearance for bottom nav on mobile */
+  .main-content { padding: 12px; }
+  .app-layout.has-bottom-nav .main-content { padding-bottom: 80px; }
+  .app-layout.has-bottom-nav { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+  /* Bottom nav visible on mobile */
+  .bottom-nav { display: flex; }
+
+  /* Desktop-only helpers */
+  .desktop-only { display: none; }
+  .mobile-only { display: flex; }
+
+  /* Home / match cards */
   .match-teams { grid-template-columns: 1fr; gap: 8px; }
   .match-vs { margin: 0 auto; width: 28px; height: 28px; font-size: 0.65rem; }
   .odds-grid { grid-template-columns: 1fr; }
   .odds-buttons { justify-content: center; }
+
+  /* Banner carousel */
+  .banner-carousel { height: 140px; }
+  .banner-title { font-size: 1.15rem; }
+  .banner-emoji { font-size: 2.4rem; }
+  .banner-slide { padding: 16px 20px; }
+  .banner-content { gap: 12px; }
+
+  /* Casino sections */
+  .casino-game-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .casino-game-art { aspect-ratio: 1.2; }
+  .casino-match-list { grid-template-columns: 1fr; }
+  .casino-section-title { font-size: 1rem; }
+  .cmc-team-logo { width: 46px; height: 46px; font-size: 0.75rem; }
+  .cmc-team-name { font-size: 0.72rem; }
+
+  /* Category tabs */
+  .category-tabs { gap: 5px; }
+  .cat-tab { padding: 7px 12px; font-size: 0.75rem; }
+
+  /* Auth pages */
+  .auth-container { flex-direction: column; }
+  .auth-brand {
+    padding: 24px 20px;
+    min-height: auto;
+  }
+  .auth-brand-tagline { font-size: 1.15rem; }
+  .auth-brand-desc { display: none; }
+  .auth-brand-stats { gap: 16px; }
+  .auth-brand-stat-num { font-size: 1.15rem; }
+  .auth-brand-features { display: none; }
+  .auth-form-panel { max-width: 100%; padding: 24px 20px 32px; }
   .auth-card { padding: 0; }
-  .admin-sidebar { display: none; }
+
+  /* Admin */
+  .admin-mobile-bar { display: flex; }
+  .admin-layout { flex-direction: column; }
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 280px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 100;
+    padding-top: 20px;
+  }
+  .admin-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 6px 0 24px rgba(0,0,0,0.5);
+  }
+  .admin-sidebar.mobile-open ~ .admin-sidebar-backdrop,
+  body:has(.admin-sidebar.mobile-open) .admin-sidebar-backdrop { display: block; }
+  .admin-sidebar-backdrop.open { display: block; }
+  .admin-sidebar.collapsed { width: 280px; padding: 20px 12px; }
+  .admin-sidebar.collapsed .admin-nav-item { justify-content: flex-start; padding: 10px 16px; }
+  .admin-sidebar.collapsed .admin-nav-item span { display: inline; }
   .admin-content { padding: 16px; }
+  .admin-page-header { flex-direction: column; align-items: flex-start; }
+  .admin-search { min-width: 100%; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
-  .chat-panel { width: calc(100vw - 32px); right: -8px; }
+  .payments-cards { grid-template-columns: 1fr; }
+
+  /* Chat widget — lift above bottom nav */
+  .chat-widget { bottom: 80px; right: 12px; }
+  .chat-toggle { width: 48px; height: 48px; font-size: 1.2rem; }
+  .chat-panel { width: calc(100vw - 24px); right: -4px; max-width: 100%; }
+
+  /* Wallet */
   .wallet-balance-amount { font-size: 2rem; }
+  .wallet-actions { flex-direction: column; gap: 8px; }
+
+  /* Bet slip */
   .bet-slip { max-width: 100%; }
 
-  .mobile-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border-light);
-    display: flex;
-    justify-content: space-around;
-    padding: 8px 0;
-    z-index: 99;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-  }
+  /* Bet match page */
+  .bet-team-card { padding: 18px 10px; }
+  .bet-team-logo { width: 50px; height: 50px; font-size: 0.8rem; }
+  .bet-team-name { font-size: 0.8rem; }
+  .bet-stake-grid { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 6px; }
 
-  .mobile-nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 12px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--text-tertiary);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-  }
+  /* Games lobby */
+  .casino-lobby-hero { padding: 16px; }
+  .casino-lobby-title { font-size: 1.25rem; }
+  .casino-lobby-grid { grid-template-columns: 1fr; gap: 12px; }
 
-  .mobile-nav-item.active {
-    color: var(--accent-primary);
-  }
+  /* Aviator */
+  .aviator-screen { height: 280px; }
+  .aviator-mul-value { font-size: 3.5rem; }
+  .crash-history-bar { padding: 8px 10px; gap: 10px; }
+  .crash-chip { font-size: 0.8rem; }
+  .aviator-logo-text { font-size: 1.1rem; }
 
-  .mobile-nav-item svg {
-    width: 20px;
-    height: 20px;
-  }
+  /* WinGo / Color game */
+  .wingo-page { padding: 10px !important; }
+  .wingo-wallet-row { padding: 12px; gap: 8px; }
+  .wingo-wd-btn { padding: 12px; font-size: 0.9rem; }
+  .wingo-marquee { padding: 8px 10px; font-size: 0.75rem; }
+  .wingo-marquee-text { font-size: 0.75rem; }
+  .wingo-marquee-detail { padding: 5px 10px; font-size: 0.7rem; }
+  .wingo-modes { grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 6px; }
+  .wingo-mode { padding: 8px 2px; }
+  .wingo-mode-label { font-size: 0.7rem; }
+  .wingo-mode-sub { font-size: 0.6rem; }
+  .wingo-round { grid-template-columns: 1fr; gap: 10px; padding: 12px; }
+  .wingo-round-left { border-right: none; border-bottom: 1px dashed rgba(255,255,255,0.15); padding-right: 0; padding-bottom: 10px; }
+  .wingo-round-right { padding-left: 0; align-items: flex-start; text-align: left; }
+  .wingo-round::before, .wingo-round::after { display: none; }
+  .wingo-colors { padding: 10px; gap: 8px; }
+  .wingo-color-pill { padding: 12px; font-size: 0.9rem; }
+  .wingo-balls { padding: 10px; gap: 8px; }
+  .wingo-ball { font-size: 1.2rem; }
+  .wingo-mult { padding: 7px 10px; font-size: 0.75rem; }
+  .wingo-bigsmall-btn { padding: 12px; font-size: 0.9rem; }
+  .wingo-history-head, .wingo-history-row { padding: 8px 10px; font-size: 0.75rem; }
+
+  /* Coin flip */
+  .coin { width: 100px; height: 100px; font-size: 3rem; }
+  .coin-choice { padding: 18px 8px; }
+  .coin-choice-icon { width: 48px; height: 48px; font-size: 1.3rem; }
+
+  /* Color picker grids for ColorGame (existing one) */
+  .color-picker { grid-template-columns: 1fr; }
+  .number-grid { grid-template-columns: repeat(5, 1fr); }
+
+  /* Tables */
+  .data-table { font-size: 0.8rem; }
+  .data-table th, .data-table td { padding: 8px 10px; }
+
+  /* Modals */
+  .modal { max-width: calc(100vw - 32px); max-height: calc(100vh - 40px); }
+
+  /* Toast */
+  .toast { right: 12px; left: 12px; max-width: none; }
+
+  /* Form submit buttons full width */
+  .btn-lg { font-size: 0.95rem; padding: 12px 20px; }
+
+  /* Profile page */
+  .profile-card { padding: 24px 20px; }
+  .profile-avatar { width: 68px; height: 68px; font-size: 1.7rem; }
+  .profile-name { font-size: 1.2rem; }
+}
+
+@media (max-width: 480px) {
+  .casino-game-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .banner-title { font-size: 1rem; }
+  .banner-emoji { font-size: 2rem; }
+  .banner-carousel { height: 120px; }
+  .aviator-mul-value { font-size: 2.8rem; }
+  .aviator-screen { height: 240px; }
+  .wingo-ball { font-size: 1rem; }
+  .wingo-balls { gap: 6px; padding: 8px; }
+  .wingo-mults { gap: 5px; }
+  .wingo-mult { padding: 6px 8px; font-size: 0.7rem; }
 }
 
 @media (min-width: 769px) {
-  .mobile-nav { display: none; }
+  .bottom-nav { display: none; }
+  .admin-mobile-bar { display: none; }
 }
 
 /* ========== SCROLLBAR ========== */

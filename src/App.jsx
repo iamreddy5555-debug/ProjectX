@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Header from './components/Header';
+import BottomNav from './components/BottomNav';
 import ChatWidget from './components/ChatWidget';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -24,11 +25,14 @@ function ProtectedRoute({ children }) {
 
 function AppRoutes() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const isAdmin = pathname.startsWith('/admin');
+  const isAuthPage = pathname === '/login' || pathname === '/register';
 
   return (
     <>
       <Header />
-      <div className="app-layout">
+      <div className={`app-layout ${!isAdmin && !isAuthPage ? 'has-bottom-nav' : ''}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -45,6 +49,7 @@ function AppRoutes() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
+      {!isAdmin && !isAuthPage && <BottomNav />}
       {user && user.role !== 'admin' && <ChatWidget />}
     </>
   );

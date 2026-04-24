@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CreditCard, QrCode, Trophy,
-  MessageCircle, LogOut, Gamepad2, Target, ChevronLeft, ChevronRight
+  MessageCircle, LogOut, Gamepad2, Target, ChevronLeft, ChevronRight, Menu, X
 } from 'lucide-react';
 import AdminDashboard from './AdminDashboard';
 import AdminUsers from './AdminUsers';
@@ -31,6 +31,7 @@ export default function AdminLayout() {
   const [pendingCount, setPendingCount] = useState(0);
   const [unreadChats, setUnreadChats] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   if (!user || user.role !== 'admin') {
     return <Navigate to="/login" replace />;
@@ -56,13 +57,34 @@ export default function AdminLayout() {
     return 0;
   };
 
+  const pickPage = (id) => {
+    setActivePage(id);
+    setMobileOpen(false);
+  };
+
   return (
     <div className="admin-layout">
-      <aside className={`admin-sidebar ${collapsed ? 'collapsed' : ''}`}>
+      {/* Mobile top bar with hamburger */}
+      <div className="admin-mobile-bar">
+        <button className="admin-mobile-toggle" onClick={() => setMobileOpen(true)}>
+          <Menu size={20} />
+        </button>
+        <span className="admin-mobile-title">
+          {navItems.find(n => n.id === activePage)?.label || 'Admin'}
+        </span>
+      </div>
+
+      {/* Mobile overlay backdrop */}
+      {mobileOpen && <div className="admin-sidebar-backdrop" onClick={() => setMobileOpen(false)} />}
+
+      <aside className={`admin-sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="admin-sidebar-header">
           {!collapsed && <div className="admin-sidebar-title">Admin Panel</div>}
-          <button className="admin-collapse-btn" onClick={() => setCollapsed(!collapsed)}>
+          <button className="admin-collapse-btn desktop-only" onClick={() => setCollapsed(!collapsed)}>
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+          <button className="admin-collapse-btn mobile-only" onClick={() => setMobileOpen(false)}>
+            <X size={16} />
           </button>
         </div>
 
@@ -73,7 +95,7 @@ export default function AdminLayout() {
               <button
                 key={item.id}
                 className={`admin-nav-item ${activePage === item.id ? 'active' : ''}`}
-                onClick={() => setActivePage(item.id)}
+                onClick={() => pickPage(item.id)}
                 title={collapsed ? item.label : ''}
               >
                 <item.icon size={18} />
