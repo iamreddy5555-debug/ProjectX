@@ -5066,6 +5066,45 @@ a {
   border-color: transparent;
 }
 
+.top-tab-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.top-tab:not(.active) .top-tab-count {
+  background: var(--bg-primary);
+  color: var(--accent-primary);
+}
+
+/* Live bets table */
+.live-bets-table tr.bet-won { background: rgba(34, 197, 94, 0.05); }
+.live-bets-table tr.bet-lost { background: transparent; }
+.live-bets-table tr.bet-pending {
+  background: rgba(245, 158, 11, 0.08);
+  animation: bet-pending-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes bet-pending-pulse {
+  0%, 100% { background: rgba(245, 158, 11, 0.08); }
+  50%      { background: rgba(245, 158, 11, 0.15); }
+}
+
+.bet-pending-badge {
+  padding: 2px 8px;
+  background: var(--accent-warning-light);
+  color: var(--accent-warning);
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.status-lost { background: rgba(239, 68, 68, 0.15); color: var(--accent-danger); }
+
 /* ========== BOTTOM NAV (mobile) ========== */
 .bottom-nav {
   display: none;

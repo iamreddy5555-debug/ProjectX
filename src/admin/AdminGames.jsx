@@ -14,9 +14,11 @@ const GAME_LABELS = {
 export default function AdminGames() {
   const [stats, setStats] = useState(null);
   const [control, setControl] = useState(null);
+  const [bets, setBets] = useState({ color: [], coinflip: [], aviator: [] });
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
   const [activeGame, setActiveGame] = useState('color');
+  const [betsTab, setBetsTab] = useState('color');
   const [colorRollInput, setColorRollInput] = useState('');
   const [aviatorCrashInput, setAviatorCrashInput] = useState('');
   const [lastUpdate, setLastUpdate] = useState(null);
@@ -53,12 +55,16 @@ export default function AdminGames() {
   const loadAll = async (initial = false) => {
     if (initial) setLoading(true);
     try {
-      const [s, c] = await Promise.all([
+      const [s, c, bColor, bCoin, bAviator] = await Promise.all([
         api.get('/admin/games/stats'),
         api.get('/admin/control'),
+        api.get('/admin/games/bets?game=color&limit=25'),
+        api.get('/admin/games/bets?game=coinflip&limit=25'),
+        api.get('/admin/games/bets?game=aviator&limit=25'),
       ]);
       setStats(s.data);
       setControl(c.data);
+      setBets({ color: bColor.data, coinflip: bCoin.data, aviator: bAviator.data });
       setLastUpdate(new Date());
       if (!initial) {
         setPulse(true);
@@ -69,6 +75,49 @@ export default function AdminGames() {
     } finally {
       if (initial) setLoading(false);
     }
+  };
+
+  // "30s ago" style relative time
+  const timeAgo = (date) => {
+    if (!date) return '';
+    const sec = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+    if (sec < 10) return 'just now';
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    return `${Math.floor(hr / 24)}d ago`;
+  };
+
+  // Format a bet's selection + outcome into a readable summary
+  const formatBetSelection = (bet) => {
+    if (bet.gameType === 'color') {
+      return bet.selection;
+    }
+    if (bet.gameType === 'coinflip') {
+      return bet.selection;
+    }
+    if (bet.gameType === 'aviator') {
+      return `Aviator @ ${bet.multiplier?.toFixed(2) || '?'}×`;
+    }
+    return bet.selection;
+  };
+
+  const formatBetOutcome = (bet) => {
+    if (bet.gameType === 'color') {
+      const [num, colors] = (bet.outcome || ':').split(':');
+      return `Rolled ${num} (${colors})`;
+    }
+    if (bet.gameType === 'coinflip') {
+      return `Landed ${bet.outcome}`;
+    }
+    if (bet.gameType === 'aviator') {
+      if (bet.outcome === 'crashed') return `Crashed @ ${bet.crashPoint?.toFixed(2)}×`;
+      if (bet.outcome === 'cashout') return `Cashed @ ${bet.multiplier?.toFixed(2)}×`;
+      return bet.outcome || 'pending';
+    }
+    return bet.outcome;
   };
 
   const secondsAgo = lastUpdate ? Math.floor((Date.now() - lastUpdate.getTime()) / 1000) : null;
@@ -338,6 +387,87 @@ export default function AdminGames() {
               Clear override
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Live bets feed per game */}
+      <div className="admin-section">
+        <h2 className="admin-section-title">
+          <span className="live-pill-dot" style={{ color: '#22c55e' }} />
+          Live Bets Feed
+        </h2>
+
+        <div className="top-users-tabs">
+          {Object.keys(GAME_LABELS).map(key => {
+            const count = bets[key]?.length || 0;
+            return (
+              <button
+                key={key}
+                className={`top-tab ${betsTab === key ? 'active' : ''}`}
+                onClick={() => setBetsTab(key)}
+              >
+                {GAME_LABELS[key].name}
+                <span className="top-tab-count">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="admin-table-wrap">
+          <table className="data-table live-bets-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>User</th>
+                <th>Bet</th>
+                <th>Stake</th>
+                <th>Outcome</th>
+                <th>Result</th>
+                <th>Payout</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(bets[betsTab] || []).length === 0 ? (
+                <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 24 }}>
+                  No bets yet on this game
+                </td></tr>
+              ) : (
+                (bets[betsTab] || []).map((bet) => (
+                  <tr key={bet._id} className={bet.won ? 'bet-won' : bet.status === 'pending' ? 'bet-pending' : 'bet-lost'}>
+                    <td style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                      {timeAgo(bet.createdAt)}
+                    </td>
+                    <td>
+                      <div className="table-user">
+                        <div className="table-user-avatar">{bet.userId?.name?.charAt(0)?.toUpperCase() || '?'}</div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{bet.userId?.name || 'Unknown'}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>{bet.userId?.phone || bet.userId?.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ fontSize: '0.85rem', textTransform: 'capitalize' }}>{formatBetSelection(bet)}</td>
+                    <td style={{ fontWeight: 700 }}>{formatCurrency(bet.stake)}</td>
+                    <td style={{ fontSize: '0.8rem' }}>
+                      {bet.status === 'pending' ? <span className="bet-pending-badge">Pending</span> : formatBetOutcome(bet)}
+                    </td>
+                    <td>
+                      {bet.status === 'pending' ? (
+                        <span className="status-badge status-pending">Flying</span>
+                      ) : bet.won ? (
+                        <span className="status-badge status-won">Won</span>
+                      ) : (
+                        <span className="status-badge status-lost">Lost</span>
+                      )}
+                    </td>
+                    <td style={{ fontWeight: 700, color: bet.won ? 'var(--accent-success)' : 'var(--text-tertiary)' }}>
+                      {bet.payout > 0 ? `+${formatCurrency(bet.payout)}` : '—'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
