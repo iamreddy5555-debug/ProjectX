@@ -6,6 +6,8 @@ import { ArrowLeft, Wallet, Plane } from 'lucide-react';
 import api from '../../utils/api';
 
 const STAKES = [10, 20, 50, 100, 500, 1000, 2000];
+const MIN_STAKE = 10;
+const MAX_STAKE = 10000;
 
 // Local multiplier from elapsed time — MUST match the server formula
 // Server: multiplier = 1.06^tSec
@@ -159,6 +161,25 @@ export default function Aviator() {
                   ₹{s}
                 </button>
               ))}
+            </div>
+            <div className="custom-stake-row">
+              <label>Or enter custom:</label>
+              <div className="custom-stake-input">
+                <span>₹</span>
+                <input
+                  type="number"
+                  min={MIN_STAKE}
+                  max={MAX_STAKE}
+                  step="1"
+                  value={stake}
+                  onChange={e => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isFinite(v)) setStake(v);
+                  }}
+                  placeholder={`${MIN_STAKE}-${MAX_STAKE}`}
+                />
+              </div>
+              <span className="custom-stake-hint">Min ₹{MIN_STAKE} • Max ₹{MAX_STAKE}</span>
             </div>
           </div>
 

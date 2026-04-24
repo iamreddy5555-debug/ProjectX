@@ -6,6 +6,8 @@ import { ArrowLeft, Wallet } from 'lucide-react';
 import api from '../../utils/api';
 
 const STAKES = [10, 50, 100, 500, 1000, 2000];
+const MIN_STAKE = 10;
+const MAX_STAKE = 10000;
 const NUMBERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 const colorFor = (n) => {
@@ -134,6 +136,26 @@ export default function ColorGame() {
               ₹{s}
             </button>
           ))}
+        </div>
+        <div className="custom-stake-row">
+          <label>Or enter custom:</label>
+          <div className="custom-stake-input">
+            <span>₹</span>
+            <input
+              type="number"
+              min={MIN_STAKE}
+              max={MAX_STAKE}
+              step="1"
+              value={stake}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10);
+                if (Number.isFinite(v)) setStake(v);
+              }}
+              disabled={playing}
+              placeholder={`${MIN_STAKE}-${MAX_STAKE}`}
+            />
+          </div>
+          <span className="custom-stake-hint">Min ₹{MIN_STAKE} • Max ₹{MAX_STAKE}</span>
         </div>
       </div>
 

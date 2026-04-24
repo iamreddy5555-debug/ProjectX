@@ -4,23 +4,29 @@ const User = require('../models/User');
 const { auth } = require('../middleware/auth');
 const router = express.Router();
 
-// Each game has its own stake tiers (keeps games differentiated from cricket bets)
-const STAKE_TIERS = {
-  color:    [10, 50, 100, 500, 1000, 2000],
-  coinflip: [20, 100, 300, 1000, 3000],
-  aviator:  [10, 20, 50, 100, 500, 1000, 2000],
+// Per-game stake limits. Users can use preset tiers OR any custom integer
+// amount within [min, max]. Tiers are just UI shortcuts.
+const GAME_LIMITS = {
+  color:    { min: 10, max: 10000 },
+  coinflip: { min: 20, max: 10000 },
+  aviator:  { min: 10, max: 10000 },
 };
 
 // ===== Helpers =====
 const getUserChecked = async (userId, stake, gameType) => {
-  const allowed = STAKE_TIERS[gameType];
-  if (!allowed || !allowed.includes(stake)) {
-    throw { code: 400, message: `Invalid stake. Allowed: ${(allowed || []).join(', ')}` };
+  const limits = GAME_LIMITS[gameType];
+  if (!limits) throw { code: 400, message: 'Unknown game type' };
+  const amt = Number(stake);
+  if (!Number.isFinite(amt) || !Number.isInteger(amt) || amt <= 0) {
+    throw { code: 400, message: 'Stake must be a positive whole number' };
   }
+  if (amt < limits.min) throw { code: 400, message: `Minimum stake is ₹${limits.min}` };
+  if (amt > limits.max) throw { code: 400, message: `Maximum stake is ₹${limits.max}` };
+
   const user = await User.findById(userId);
   if (!user) throw { code: 404, message: 'User not found' };
   if (user.banned) throw { code: 403, message: 'Account suspended' };
-  if (user.balance < stake) throw { code: 400, message: 'Insufficient balance' };
+  if (user.balance < amt) throw { code: 400, message: 'Insufficient balance' };
   return user;
 };
 

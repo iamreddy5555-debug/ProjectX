@@ -6,6 +6,8 @@ import { ArrowLeft, Wallet } from 'lucide-react';
 import api from '../../utils/api';
 
 const STAKES = [20, 100, 300, 1000, 3000];
+const MIN_STAKE = 20;
+const MAX_STAKE = 10000;
 
 export default function CoinFlip() {
   const { user, updateBalance } = useAuth();
@@ -103,6 +105,26 @@ export default function CoinFlip() {
                   <span className="game-stake-win">→ ₹{s * 2}</span>
                 </button>
               ))}
+            </div>
+            <div className="custom-stake-row">
+              <label>Or enter custom:</label>
+              <div className="custom-stake-input">
+                <span>₹</span>
+                <input
+                  type="number"
+                  min={MIN_STAKE}
+                  max={MAX_STAKE}
+                  step="1"
+                  value={stake}
+                  onChange={e => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isFinite(v)) setStake(v);
+                  }}
+                  disabled={flipping}
+                  placeholder={`${MIN_STAKE}-${MAX_STAKE}`}
+                />
+              </div>
+              <span className="custom-stake-hint">Win ₹{stake * 2} • Min ₹{MIN_STAKE} • Max ₹{MAX_STAKE}</span>
             </div>
           </div>
 
