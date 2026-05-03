@@ -35,6 +35,11 @@ export default function Aviator() {
   const [error, setError] = useState('');
   const [placing, setPlacing] = useState(false);
   const [cashingOut, setCashingOut] = useState(false);
+  // Auto cash-out target — null = disabled, otherwise the multiplier to fire at
+  const [autoCashoutEnabled, setAutoCashoutEnabled] = useState(false);
+  const [autoCashoutTarget, setAutoCashoutTarget] = useState('2.00');
+  const autoFiredRef = useRef(false);
+  const cashoutRef = useRef(null);
   const rafRef = useRef(null);
   const tickRef = useRef(null);
 
@@ -72,16 +77,41 @@ export default function Aviator() {
     return () => clearInterval(tickRef.current);
   }, [round?.bettingEndsAt, round?.phase]);
 
-  // Multiplier animation while flying
+  // Multiplier animation while flying — also fires auto-cashout when the
+  // live multiplier reaches the user's pre-committed target.
   useEffect(() => {
-    if (round?.phase !== 'flying' || !round?.startedAt) { setCurrentMul(1.0); return; }
+    if (round?.phase !== 'flying' || !round?.startedAt) {
+      setCurrentMul(1.0);
+      return;
+    }
     const tick = () => {
-      setCurrentMul(computeMultiplier(round.startedAt));
+      const m = computeMultiplier(round.startedAt);
+      setCurrentMul(m);
+
+      // Auto cash-out: fire once when the live multiplier crosses the target
+      if (
+        autoCashoutEnabled &&
+        !autoFiredRef.current &&
+        myBet?.status === 'pending'
+      ) {
+        const target = parseFloat(autoCashoutTarget);
+        if (Number.isFinite(target) && target > 1 && m >= target) {
+          autoFiredRef.current = true;
+          cashoutRef.current?.();
+        }
+      }
+
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [round?.phase, round?.startedAt]);
+  }, [round?.phase, round?.startedAt, autoCashoutEnabled, autoCashoutTarget, myBet?.status]);
+
+  // Reset auto-fire flag at the start of every new round so the next flight
+  // can fire its own auto-cashout.
+  useEffect(() => {
+    if (round?.phase === 'waiting') autoFiredRef.current = false;
+  }, [round?.roundId, round?.phase]);
 
   const canBet = round?.phase === 'waiting' && secondsLeft > 0 && !myBet;
 
@@ -109,7 +139,6 @@ export default function Aviator() {
       const res = await api.post('/games/aviator/cashout', { betId: myBet._id });
       updateBalance(res.data.newBalance);
       setCashResult({ multiplier: res.data.multiplier, payout: res.data.payout });
-      // Mark my bet as settled locally
       setMyBet(prev => prev ? { ...prev, status: 'settled', won: true, multiplier: res.data.multiplier, payout: res.data.payout } : prev);
     } catch (err) {
       setError(err.response?.data?.message || 'Cashout failed');
@@ -117,16 +146,23 @@ export default function Aviator() {
       setCashingOut(false);
     }
   };
+  // Keep ref in sync so the RAF loop can fire auto-cashout without re-binding
+  cashoutRef.current = cashout;
 
   const phase = round?.phase;
   const crashed = phase === 'crashed';
   const flying = phase === 'flying';
   const waiting = phase === 'waiting';
 
-  const displayMul = flying ? currentMul : (crashed ? round?.crashPoint : 1.0);
-
   const iCashedOut = cashResult || (myBet?.status === 'settled' && myBet?.won);
   const iLost = myBet?.status === 'settled' && !myBet?.won;
+  const lockedMul = cashResult?.multiplier ?? myBet?.multiplier ?? 1;
+
+  // While flying, a user who already cashed out sees their LOCKED multiplier
+  // (not the live one) so the visual matches their closed trade.
+  const displayMul = flying
+    ? (iCashedOut ? lockedMul : currentMul)
+    : (crashed ? round?.crashPoint : 1.0);
 
   const history = round?.lastCrashes || [];
 
@@ -158,7 +194,8 @@ export default function Aviator() {
         <AviatorSky crashed={crashed} />
         <AxisDots />
 
-        {flying && <FlightPath currentMul={currentMul} crashed={false} />}
+        {flying && !iCashedOut && <FlightPath currentMul={currentMul} crashed={false} />}
+        {flying && iCashedOut && <FlightPath currentMul={lockedMul} crashed={false} />}
         {crashed && <FlightPath currentMul={round.crashPoint || 1} crashed={true} />}
 
         <div className="aviator-multiplier">
@@ -176,10 +213,15 @@ export default function Aviator() {
               <span className={`aviator-mul-value ${crashed ? 'crashed' : iCashedOut ? 'cashed' : ''}`}>
                 {Number(displayMul || 1).toFixed(2)}x
               </span>
+              {flying && iCashedOut && (
+                <div className="aviator-status won">
+                  Cashed out @ {lockedMul.toFixed(2)}× — +₹{cashResult?.payout || myBet?.payout}
+                </div>
+              )}
               {crashed && (
                 <div className={`aviator-status ${iCashedOut ? 'won' : iLost ? 'lost' : ''}`}>
                   {iCashedOut ? (
-                    <>Cashed out @ {(cashResult?.multiplier || myBet?.multiplier).toFixed(2)}× — +₹{cashResult?.payout || myBet?.payout}</>
+                    <>Cashed out @ {lockedMul.toFixed(2)}× — +₹{cashResult?.payout || myBet?.payout}</>
                   ) : iLost ? (
                     <>FLEW AWAY @ {round.crashPoint.toFixed(2)}× — lost ₹{myBet.stake}</>
                   ) : (
@@ -191,8 +233,9 @@ export default function Aviator() {
           )}
         </div>
 
-        {flying && <PlaneShape currentMul={currentMul} crashed={false} />}
-        {crashed && <PlaneShape currentMul={round.crashPoint || 1} crashed={true} />}
+        {flying && !iCashedOut && <PlaneShape currentMul={currentMul} variant="flying" />}
+        {flying && iCashedOut && <PlaneShape currentMul={lockedMul} variant="cashed" />}
+        {crashed && <PlaneShape currentMul={round.crashPoint || 1} variant="crashed" />}
       </div>
 
       {/* Controls by phase */}
@@ -220,6 +263,35 @@ export default function Aviator() {
             </div>
           </div>
 
+          <div className="game-section">
+            <div className="game-section-title aviator-auto-row">
+              <label className="aviator-auto-toggle">
+                <input
+                  type="checkbox"
+                  checked={autoCashoutEnabled}
+                  onChange={e => setAutoCashoutEnabled(e.target.checked)}
+                />
+                Auto cash out
+              </label>
+              <div className={`aviator-auto-input ${autoCashoutEnabled ? '' : 'disabled'}`}>
+                <input
+                  type="number"
+                  min="1.10"
+                  step="0.10"
+                  value={autoCashoutTarget}
+                  disabled={!autoCashoutEnabled}
+                  onChange={e => setAutoCashoutTarget(e.target.value)}
+                />
+                <span>×</span>
+              </div>
+            </div>
+            <div className="aviator-auto-hint">
+              {autoCashoutEnabled
+                ? `Will auto cash-out the moment the multiplier hits ${parseFloat(autoCashoutTarget || 0).toFixed(2)}×`
+                : 'Toggle on to lock in a target multiplier — your bet will cash out automatically when reached'}
+            </div>
+          </div>
+
           {error && <div className="form-error-box">{error}</div>}
 
           <button className="btn btn-primary btn-lg game-play-btn" onClick={placeBet} disabled={placing || !canBet}>
@@ -231,6 +303,11 @@ export default function Aviator() {
       {waiting && myBet && (
         <div className="aviator-live-payout">
           Bet locked in — waiting for takeoff ({secondsLeft}s)
+          {autoCashoutEnabled && parseFloat(autoCashoutTarget) > 1 && (
+            <div className="aviator-auto-chip">
+              Auto cash-out armed @ {parseFloat(autoCashoutTarget).toFixed(2)}×
+            </div>
+          )}
         </div>
       )}
 
@@ -238,6 +315,11 @@ export default function Aviator() {
         <>
           <div className="aviator-live-payout">
             Current payout: <strong>₹{(myBet.stake * currentMul).toFixed(0)}</strong>
+            {autoCashoutEnabled && parseFloat(autoCashoutTarget) > 1 && (
+              <span className="aviator-auto-chip inline">
+                Auto @ {parseFloat(autoCashoutTarget).toFixed(2)}×
+              </span>
+            )}
           </div>
           <button className="btn btn-danger btn-lg game-play-btn aviator-cashout-btn"
             onClick={cashout} disabled={cashingOut}>
@@ -246,7 +328,13 @@ export default function Aviator() {
         </>
       )}
 
-      {flying && (!myBet || myBet.status !== 'pending') && (
+      {flying && iCashedOut && (
+        <div className="aviator-live-payout aviator-cashed-banner">
+          You cashed out at <strong>{lockedMul.toFixed(2)}×</strong> — won ₹{cashResult?.payout || myBet?.payout}
+        </div>
+      )}
+
+      {flying && !myBet && (
         <div className="aviator-live-payout">
           Plane is flying — betting on next flight
         </div>
@@ -271,11 +359,14 @@ function pathCoords(mul, crashed) {
   return { x, y, rot };
 }
 
-function PlaneShape({ currentMul, crashed }) {
-  const { x, y, rot } = pathCoords(currentMul, crashed);
+function PlaneShape({ currentMul, variant = 'flying', crashed: legacyCrashed }) {
+  // Backwards-compat for the old crashed boolean prop
+  const v = legacyCrashed ? 'crashed' : variant;
+  const { x, y, rot } = pathCoords(currentMul, v === 'crashed');
+  const cls = v === 'crashed' ? 'falling' : v === 'cashed' ? 'cashed-out' : '';
   return (
     <div
-      className={`aviator-plane-wrap ${crashed ? 'falling' : ''}`}
+      className={`aviator-plane-wrap ${cls}`}
       style={{ left: `${x * 100}%`, top: `${y * 100}%`, transform: `translate(-50%, -50%) rotate(${rot}deg)` }}
     >
       <svg className="aviator-plane-svg" width="86" height="42" viewBox="0 0 86 42">
