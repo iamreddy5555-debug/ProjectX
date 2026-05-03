@@ -80,6 +80,13 @@ const startColorRound = async () => {
 };
 
 const revealColorRound = async (roundId) => {
+  // Close the betting window synchronously, BEFORE any awaits, so any bet
+  // request that lost the race against this timer is rejected by the
+  // route's `cur.phase !== 'betting'` check rather than slipping through.
+  if (state.color.roundId === roundId && state.color.phase === 'betting') {
+    state.color = { ...state.color, phase: 'closing' };
+  }
+
   // Determine result (admin override wins)
   const control = await AdminControl.getSingleton();
   let number;
@@ -174,6 +181,10 @@ const startCoinflipRound = async () => {
 };
 
 const revealCoinflipRound = async (roundId) => {
+  if (state.coinflip.roundId === roundId && state.coinflip.phase === 'betting') {
+    state.coinflip = { ...state.coinflip, phase: 'closing' };
+  }
+
   const control = await AdminControl.getSingleton();
   let outcome;
   if (control.nextCoinflipOutcome) {
@@ -254,6 +265,10 @@ const startAviatorBetting = async () => {
 };
 
 const startAviatorFlight = async (roundId, crashPoint) => {
+  // Close betting synchronously so late bets are rejected cleanly.
+  if (state.aviator.roundId === roundId && state.aviator.phase === 'waiting') {
+    state.aviator = { ...state.aviator, phase: 'closing' };
+  }
   const now = Date.now();
   await GameRound.findOneAndUpdate({ roundId }, { phase: 'flying', startedAt: new Date(now) });
   state.aviator = { ...state.aviator, phase: 'flying', startedAt: new Date(now).toISOString() };
@@ -336,6 +351,10 @@ const startLudoRound = async () => {
 };
 
 const startLudoRacing = async (roundId) => {
+  if (state.ludo.roundId === roundId && state.ludo.phase === 'betting') {
+    state.ludo = { ...state.ludo, phase: 'closing' };
+  }
+
   // Pick the forced winner (if admin set one) up front so we can bias ties.
   // Dice overrides are re-read every turn so admin can change them live.
   const initialControl = await AdminControl.getSingleton();

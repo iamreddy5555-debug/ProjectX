@@ -78,9 +78,6 @@ router.post('/color', auth, async (req, res) => {
     if (!cur.roundId || cur.phase !== 'betting') {
       return res.status(400).json({ message: 'Betting is closed — wait for next round' });
     }
-    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
-      return res.status(400).json({ message: 'Betting window just closed' });
-    }
 
     const user = await getUserChecked(req.user.id, stake, 'color');
     user.balance -= stake;
@@ -148,9 +145,6 @@ router.post('/coinflip', auth, async (req, res) => {
     const cur = gameRounds.getState('coinflip');
     if (!cur.roundId || cur.phase !== 'betting') {
       return res.status(400).json({ message: 'Betting is closed — wait for next round' });
-    }
-    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
-      return res.status(400).json({ message: 'Betting window just closed' });
     }
 
     const user = await getUserChecked(req.user.id, stake, 'coinflip');
@@ -249,9 +243,6 @@ router.post('/ludo', auth, async (req, res) => {
     if (!cur.roundId || cur.phase !== 'betting') {
       return res.status(400).json({ message: 'Betting is closed — wait for next race' });
     }
-    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
-      return res.status(400).json({ message: 'Betting window just closed' });
-    }
 
     const user = await getUserChecked(req.user.id, stake, 'ludo');
     user.balance -= stake;
@@ -328,10 +319,10 @@ router.post('/aviator/start', auth, async (req, res) => {
     const { stake } = req.body;
     const cur = gameRounds.getState('aviator');
     if (!cur.roundId || cur.phase !== 'waiting') {
-      return res.status(400).json({ message: 'Plane is already flying — wait for next round' });
-    }
-    if (new Date(cur.bettingEndsAt).getTime() <= Date.now()) {
-      return res.status(400).json({ message: 'Betting just closed' });
+      const msg = cur.phase === 'flying' ? 'Plane already took off — wait for next round'
+                : cur.phase === 'crashed' ? 'Round just ended — next flight starts shortly'
+                : 'Betting is closed — wait for next round';
+      return res.status(400).json({ message: msg });
     }
 
     const user = await getUserChecked(req.user.id, stake, 'aviator');
